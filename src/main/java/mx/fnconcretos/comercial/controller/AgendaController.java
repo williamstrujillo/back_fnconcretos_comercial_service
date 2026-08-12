@@ -12,6 +12,7 @@ import mx.fnconcretos.comercial.dto.response.RutaDiariaResponse;
 import mx.fnconcretos.comercial.service.AgendaService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -34,7 +35,8 @@ public class AgendaController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Agendar una actividad (llamada, whatsapp, seguimiento, cotizacion, visita, recordatorio)")
+    @PreAuthorize("hasAuthority('agenda.administrar')")
+    @Operation(summary = "Agendar una actividad (llamada, whatsapp, seguimiento, cotizacion, visita, recordatorio); requiere permiso agenda.administrar")
     public AgendaResponse crear(@Valid @RequestBody AgendaRequest request) {
         return agendaService.crear(request);
     }
@@ -46,7 +48,8 @@ public class AgendaController {
     }
 
     @PatchMapping("/{id}/estatus")
-    @Operation(summary = "Marcar una actividad como completada/cancelada")
+    @PreAuthorize("hasAuthority('agenda.administrar')")
+    @Operation(summary = "Marcar una actividad como completada/cancelada; requiere permiso agenda.administrar")
     public AgendaResponse cambiarEstatus(@PathVariable Long id, @Valid @RequestBody EstatusRequest request) {
         return agendaService.cambiarEstatus(id, request);
     }
