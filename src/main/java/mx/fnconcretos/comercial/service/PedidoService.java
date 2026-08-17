@@ -2,6 +2,7 @@ package mx.fnconcretos.comercial.service;
 
 import lombok.RequiredArgsConstructor;
 import mx.fnconcretos.comercial.dto.request.PedidoUpdateRequest;
+import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
 import mx.fnconcretos.comercial.dto.response.AutorizacionResponse;
 import mx.fnconcretos.comercial.dto.response.AvancePedidoResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
@@ -15,12 +16,15 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 public class PedidoService {
+
+    private static final List<String> ESTATUS_PERMITEN_ENTREGA = List.of("autorizado", "programado", "parcial");
 
     private final PedidoRepository pedidoRepository;
     private final PedidoAutorizacionRepository autorizacionRepository;
@@ -58,6 +62,30 @@ public class PedidoService {
         }
         if (request.getCondicionPago() != null) pedido.setCondicionPago(request.getCondicionPago());
         if (request.getDiasCredito() != null) pedido.setDiasCredito(request.getDiasCredito());
+
+        return toResponse(pedidoRepository.save(pedido));
+    }
+
+    /**
+     * Llamado desde operaciones-service cuando se firma una remision de entrega.
+     * Acumula el volumen entregado y avanza estatusGeneral a parcial/completo.
+     */
+    @Transactional
+    public PedidoResponse registrarEntrega(Long id, RegistrarEntregaRequest request) {
+        Pedido pedido = buscarOFallar(id);
+        if (!ESTATUS_PERMITEN_ENTREGA.contains(pedido.getEstatusGeneral())) {
+            throw new EstadoInvalidoException("El pedido " + id + " no esta en un estatus que permita registrar entregas (estatus actual: "
+                    + pedido.getEstatusGeneral() + ")");
+        }
+
+        BigDecimal totalEntregado = pedido.getVolumenEntregadoM3().add(request.getMetrosEntregados());
+        if (totalEntregado.compareTo(pedido.getVolumenSolicitadoM3()) > 0) {
+            totalEntregado = pedido.getVolumenSolicitadoM3();
+        }
+
+        pedido.setVolumenEntregadoM3(totalEntregado);
+        pedido.setVolumenPendienteM3(pedido.getVolumenSolicitadoM3().subtract(totalEntregado));
+        pedido.setEstatusGeneral(totalEntregado.compareTo(pedido.getVolumenSolicitadoM3()) >= 0 ? "completo" : "parcial");
 
         return toResponse(pedidoRepository.save(pedido));
     }
