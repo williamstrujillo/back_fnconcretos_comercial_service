@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import mx.fnconcretos.comercial.dto.request.PedidoUpdateRequest;
+import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
 import mx.fnconcretos.comercial.dto.response.AvancePedidoResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
 import mx.fnconcretos.comercial.service.PedidoService;
@@ -45,5 +46,12 @@ public class PedidoController {
     @Operation(summary = "Avance del pedido: estatus general y autorizaciones registradas")
     public AvancePedidoResponse avance(@PathVariable Long id) {
         return pedidoService.avance(id);
+    }
+
+    @PatchMapping("/{id}/registrar-entrega")
+    @Operation(summary = "Acumular el volumen entregado de una remision y avanzar estatusGeneral a parcial/completo. "
+            + "Uso interno: lo invoca operaciones-service al firmar una remision, no pensado para llamarse desde la UI directamente.")
+    public PedidoResponse registrarEntrega(@PathVariable Long id, @Valid @RequestBody RegistrarEntregaRequest request) {
+        return pedidoService.registrarEntrega(id, request);
     }
 }
