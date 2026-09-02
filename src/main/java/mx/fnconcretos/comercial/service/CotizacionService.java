@@ -1,21 +1,28 @@
 package mx.fnconcretos.comercial.service;
 
 import lombok.RequiredArgsConstructor;
+import mx.fnconcretos.comercial.dto.request.CotizacionItemRequest;
 import mx.fnconcretos.comercial.dto.request.CotizacionRequest;
 import mx.fnconcretos.comercial.dto.request.ConvertirPedidoRequest;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
+import mx.fnconcretos.comercial.dto.response.CotizacionItemResponse;
 import mx.fnconcretos.comercial.dto.response.CotizacionResponse;
+import mx.fnconcretos.comercial.dto.response.PedidoItemResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
 import mx.fnconcretos.comercial.entity.AsesorComercial;
 import mx.fnconcretos.comercial.entity.Cliente;
 import mx.fnconcretos.comercial.entity.ContactoCliente;
 import mx.fnconcretos.comercial.entity.Cotizacion;
+import mx.fnconcretos.comercial.entity.CotizacionDetalle;
 import mx.fnconcretos.comercial.entity.Obra;
 import mx.fnconcretos.comercial.entity.Pedido;
+import mx.fnconcretos.comercial.entity.PedidoDetalle;
 import mx.fnconcretos.comercial.exception.EstadoInvalidoException;
 import mx.fnconcretos.comercial.exception.ResourceNotFoundException;
 import mx.fnconcretos.comercial.repository.ContactoClienteRepository;
+import mx.fnconcretos.comercial.repository.CotizacionDetalleRepository;
 import mx.fnconcretos.comercial.repository.CotizacionRepository;
+import mx.fnconcretos.comercial.repository.PedidoDetalleRepository;
 import mx.fnconcretos.comercial.repository.PedidoRepository;
 import mx.fnconcretos.comercial.security.JwtPrincipal;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,7 +42,9 @@ import java.util.List;
 public class CotizacionService {
 
     private final CotizacionRepository cotizacionRepository;
+    private final CotizacionDetalleRepository cotizacionDetalleRepository;
     private final PedidoRepository pedidoRepository;
+    private final PedidoDetalleRepository pedidoDetalleRepository;
     private final ClienteService clienteService;
     private final ObraService obraService;
     private final ContactoClienteRepository contactoClienteRepository;
@@ -71,9 +80,12 @@ public class CotizacionService {
         BigDecimal descuento = request.getPorcentajeDescuento() != null ? request.getPorcentajeDescuento() : BigDecimal.ZERO;
         validarDescuento(descuento, request.getFormaPago(), principal);
 
-        BigDecimal precioConDescuento = request.getPrecioUnitario()
-                .multiply(BigDecimal.ONE.subtract(descuento.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)));
-        BigDecimal precioTotal = precioConDescuento.multiply(request.getVolumenM3()).setScale(2, RoundingMode.HALF_UP);
+        List<CotizacionItemRequest> items = normalizarItems(request);
+        CotizacionItemRequest primero = items.get(0);
+        BigDecimal volumenTotal = items.stream().map(CotizacionItemRequest::getVolumenM3).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal precioTotal = items.stream()
+                .map(item -> precioLineaConDescuento(item, descuento))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         Cotizacion cotizacion = Cotizacion.builder()
                 .folio(generarFolio())
@@ -82,18 +94,21 @@ public class CotizacionService {
                 .contacto(contacto)
                 .plantaId(request.getPlantaId())
                 .asesor(asesor)
-                .productoId(request.getProductoId())
-                .volumenM3(request.getVolumenM3())
+                .productoId(primero.getProductoId())
+                .volumenM3(volumenTotal)
                 .tipoServicio(request.getTipoServicio() != null ? request.getTipoServicio() : "directo")
                 .fechaSuministroEstimada(request.getFechaSuministroEstimada())
                 .formaPago(request.getFormaPago() != null ? request.getFormaPago() : "efectivo")
                 .requiereFactura(request.getRequiereFactura() != null ? request.getRequiereFactura() : false)
                 .porcentajeDescuento(descuento)
-                .precioUnitario(request.getPrecioUnitario())
+                .precioUnitario(primero.getPrecioUnitario())
                 .precioTotal(precioTotal)
                 .build();
 
-        return toResponse(cotizacionRepository.save(cotizacion));
+        Cotizacion guardada = cotizacionRepository.save(cotizacion);
+        guardarDetalle(guardada, items, descuento);
+
+        return toResponse(guardada);
     }
 
     @Transactional(readOnly = true)
@@ -111,25 +126,33 @@ public class CotizacionService {
         BigDecimal descuento = request.getPorcentajeDescuento() != null ? request.getPorcentajeDescuento() : BigDecimal.ZERO;
         validarDescuento(descuento, request.getFormaPago(), principal);
 
+        List<CotizacionItemRequest> items = normalizarItems(request);
+        CotizacionItemRequest primero = items.get(0);
+        BigDecimal volumenTotal = items.stream().map(CotizacionItemRequest::getVolumenM3).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal precioTotal = items.stream()
+                .map(item -> precioLineaConDescuento(item, descuento))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         cotizacion.setCliente(clienteService.buscarOFallar(request.getClienteId()));
         cotizacion.setObra(request.getObraId() != null ? obraService.buscarOFallar(request.getObraId()) : null);
         cotizacion.setContacto(request.getContactoId() != null ? buscarContactoOFallar(request.getContactoId()) : null);
         cotizacion.setPlantaId(request.getPlantaId());
         cotizacion.setAsesor(request.getAsesorId() != null ? asesorService.buscarOFallar(request.getAsesorId()) : null);
-        cotizacion.setProductoId(request.getProductoId());
-        cotizacion.setVolumenM3(request.getVolumenM3());
+        cotizacion.setProductoId(primero.getProductoId());
+        cotizacion.setVolumenM3(volumenTotal);
         if (request.getTipoServicio() != null) cotizacion.setTipoServicio(request.getTipoServicio());
         cotizacion.setFechaSuministroEstimada(request.getFechaSuministroEstimada());
         if (request.getFormaPago() != null) cotizacion.setFormaPago(request.getFormaPago());
         if (request.getRequiereFactura() != null) cotizacion.setRequiereFactura(request.getRequiereFactura());
         cotizacion.setPorcentajeDescuento(descuento);
-        cotizacion.setPrecioUnitario(request.getPrecioUnitario());
+        cotizacion.setPrecioUnitario(primero.getPrecioUnitario());
+        cotizacion.setPrecioTotal(precioTotal);
 
-        BigDecimal precioConDescuento = request.getPrecioUnitario()
-                .multiply(BigDecimal.ONE.subtract(descuento.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)));
-        cotizacion.setPrecioTotal(precioConDescuento.multiply(request.getVolumenM3()).setScale(2, RoundingMode.HALF_UP));
+        Cotizacion guardada = cotizacionRepository.save(cotizacion);
+        cotizacionDetalleRepository.deleteByCotizacionId(guardada.getId());
+        guardarDetalle(guardada, items, descuento);
 
-        return toResponse(cotizacionRepository.save(cotizacion));
+        return toResponse(guardada);
     }
 
     @Transactional
@@ -165,7 +188,21 @@ public class CotizacionService {
                 .cotizacionOrigen(origen)
                 .build();
 
-        return toResponse(cotizacionRepository.save(copia));
+        Cotizacion guardada = cotizacionRepository.save(copia);
+
+        List<CotizacionDetalle> lineasOrigen = cotizacionDetalleRepository.findByCotizacionId(origen.getId());
+        List<CotizacionDetalle> copiaLineas = lineasOrigen.stream()
+                .map(linea -> CotizacionDetalle.builder()
+                        .cotizacion(guardada)
+                        .productoId(linea.getProductoId())
+                        .volumenM3(linea.getVolumenM3())
+                        .precioUnitario(linea.getPrecioUnitario())
+                        .precioTotal(linea.getPrecioTotal())
+                        .build())
+                .toList();
+        cotizacionDetalleRepository.saveAll(copiaLineas);
+
+        return toResponse(guardada);
     }
 
     @Transactional
@@ -173,6 +210,17 @@ public class CotizacionService {
         Cotizacion cotizacion = buscarOFallar(id);
         if (!"listo".equals(cotizacion.getEstatus())) {
             throw new EstadoInvalidoException("Solo se puede convertir a pedido una cotizacion en estatus 'listo'");
+        }
+
+        List<CotizacionDetalle> lineasCotizacion = cotizacionDetalleRepository.findByCotizacionId(cotizacion.getId());
+        if (lineasCotizacion.isEmpty()) {
+            // Cotizacion legado (creada antes del desglose por producto): una sola linea implicita.
+            lineasCotizacion = List.of(CotizacionDetalle.builder()
+                    .productoId(cotizacion.getProductoId())
+                    .volumenM3(cotizacion.getVolumenM3())
+                    .precioUnitario(cotizacion.getPrecioUnitario())
+                    .precioTotal(cotizacion.getPrecioTotal())
+                    .build());
         }
 
         Pedido pedido = Pedido.builder()
@@ -193,10 +241,52 @@ public class CotizacionService {
 
         Pedido guardado = pedidoRepository.save(pedido);
 
+        List<PedidoDetalle> lineasPedido = lineasCotizacion.stream()
+                .map(linea -> PedidoDetalle.builder()
+                        .pedido(guardado)
+                        .productoId(linea.getProductoId())
+                        .volumenSolicitadoM3(linea.getVolumenM3())
+                        .volumenPendienteM3(linea.getVolumenM3())
+                        .precioUnitario(linea.getPrecioUnitario())
+                        .precioTotal(linea.getPrecioTotal())
+                        .build())
+                .toList();
+        pedidoDetalleRepository.saveAll(lineasPedido);
+
         cotizacion.setEstatus("convertida");
         cotizacionRepository.save(cotizacion);
 
-        return toPedidoResponse(guardado);
+        return toPedidoResponse(guardado, lineasPedido);
+    }
+
+    /** Si viene "productos" se usa tal cual; si no, productoId/volumenM3/precioUnitario del encabezado se tratan como linea unica. */
+    private List<CotizacionItemRequest> normalizarItems(CotizacionRequest request) {
+        if (request.getProductos() != null && !request.getProductos().isEmpty()) {
+            return request.getProductos();
+        }
+        if (request.getProductoId() == null || request.getVolumenM3() == null || request.getPrecioUnitario() == null) {
+            throw new IllegalArgumentException("Debe indicar 'productos' o bien productoId/volumenM3/precioUnitario");
+        }
+        return List.of(new CotizacionItemRequest(request.getProductoId(), request.getVolumenM3(), request.getPrecioUnitario()));
+    }
+
+    private BigDecimal precioLineaConDescuento(CotizacionItemRequest item, BigDecimal descuento) {
+        BigDecimal precioConDescuento = item.getPrecioUnitario()
+                .multiply(BigDecimal.ONE.subtract(descuento.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)));
+        return precioConDescuento.multiply(item.getVolumenM3()).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private void guardarDetalle(Cotizacion cotizacion, List<CotizacionItemRequest> items, BigDecimal descuento) {
+        List<CotizacionDetalle> lineas = items.stream()
+                .map(item -> CotizacionDetalle.builder()
+                        .cotizacion(cotizacion)
+                        .productoId(item.getProductoId())
+                        .volumenM3(item.getVolumenM3())
+                        .precioUnitario(item.getPrecioUnitario())
+                        .precioTotal(precioLineaConDescuento(item, descuento))
+                        .build())
+                .toList();
+        cotizacionDetalleRepository.saveAll(lineas);
     }
 
     private void validarDescuento(BigDecimal descuento, String formaPago, JwtPrincipal principal) {
@@ -266,10 +356,22 @@ public class CotizacionService {
                 .estatus(cotizacion.getEstatus())
                 .cotizacionOrigenId(cotizacion.getCotizacionOrigen() != null ? cotizacion.getCotizacionOrigen().getId() : null)
                 .createdAt(cotizacion.getCreatedAt())
+                .productos(cotizacionDetalleRepository.findByCotizacionId(cotizacion.getId()).stream()
+                        .map(this::toItemResponse).toList())
                 .build();
     }
 
-    private PedidoResponse toPedidoResponse(Pedido pedido) {
+    private CotizacionItemResponse toItemResponse(CotizacionDetalle linea) {
+        return CotizacionItemResponse.builder()
+                .id(linea.getId())
+                .productoId(linea.getProductoId())
+                .volumenM3(linea.getVolumenM3())
+                .precioUnitario(linea.getPrecioUnitario())
+                .precioTotal(linea.getPrecioTotal())
+                .build();
+    }
+
+    private PedidoResponse toPedidoResponse(Pedido pedido, List<PedidoDetalle> lineas) {
         return PedidoResponse.builder()
                 .id(pedido.getId())
                 .folio(pedido.getFolio())
@@ -294,6 +396,15 @@ public class CotizacionService {
                 .estatusGeneral(pedido.getEstatusGeneral())
                 .motivoRechazo(pedido.getMotivoRechazo())
                 .createdAt(pedido.getCreatedAt())
+                .productos(lineas.stream().map(linea -> PedidoItemResponse.builder()
+                        .id(linea.getId())
+                        .productoId(linea.getProductoId())
+                        .volumenSolicitadoM3(linea.getVolumenSolicitadoM3())
+                        .volumenEntregadoM3(linea.getVolumenEntregadoM3())
+                        .volumenPendienteM3(linea.getVolumenPendienteM3())
+                        .precioUnitario(linea.getPrecioUnitario())
+                        .precioTotal(linea.getPrecioTotal())
+                        .build()).toList())
                 .build();
     }
 }
