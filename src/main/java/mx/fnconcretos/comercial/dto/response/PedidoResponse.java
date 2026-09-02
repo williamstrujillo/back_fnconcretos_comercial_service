@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -24,10 +25,15 @@ public class PedidoResponse {
     private Long plantaId;
     private Long asesorId;
     private String asesorNombre;
+
+    /** Primer producto de "productos"; se conserva por compatibilidad. */
     private Long productoId;
+    /** Agregados de todas las lineas de "productos"; se conservan por compatibilidad. */
     private BigDecimal volumenSolicitadoM3;
     private BigDecimal volumenEntregadoM3;
     private BigDecimal volumenPendienteM3;
+    /** Desglose real por producto (puede tener 1 o mas lineas). */
+    private List<PedidoItemResponse> productos;
     private String tipoServicio;
     private LocalDate fechaProgramada;
     private String condicionPago;

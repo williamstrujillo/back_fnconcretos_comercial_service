@@ -17,4 +17,10 @@ public class RegistrarEntregaRequest {
 
     @NotNull(message = "metrosEntregados es obligatorio")
     private BigDecimal metrosEntregados;
+
+    /** Linea de pedido_detalle que esta entrega surte; null si el pedido no tiene desglose (legado). */
+    private Long pedidoDetalleId;
+
+    /** Producto entregado; se usa para ubicar la linea si no se manda pedidoDetalleId. */
+    private Long productoId;
 }

@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -24,8 +25,13 @@ public class CotizacionResponse {
     private Long plantaId;
     private Long asesorId;
     private String asesorNombre;
+
+    /** Primer producto de "productos"; se conserva por compatibilidad. */
     private Long productoId;
+    /** Suma del volumen de todas las lineas de "productos"; se conserva por compatibilidad. */
     private BigDecimal volumenM3;
+    /** Desglose real por producto (puede tener 1 o mas lineas). */
+    private List<CotizacionItemResponse> productos;
     private String tipoServicio;
     private LocalDate fechaSuministroEstimada;
     private String formaPago;
