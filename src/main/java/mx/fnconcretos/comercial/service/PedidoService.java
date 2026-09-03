@@ -82,12 +82,14 @@ public class PedidoService {
                     + pedido.getEstatusGeneral() + ")");
         }
 
-        List<PedidoDetalle> lineas = pedidoDetalleRepository.findByPedidoId(id);
-        if (lineas.isEmpty()) {
+        List<PedidoDetalle> lineasProducto = pedidoDetalleRepository.findByPedidoId(id).stream()
+                .filter(l -> "producto".equals(l.getTipoLinea()))
+                .toList();
+        if (lineasProducto.isEmpty()) {
             // Pedido legado (sin desglose por producto): igual que antes, se acumula solo a nivel encabezado.
             acumularEntregaEnEncabezado(pedido, request.getMetrosEntregados());
         } else {
-            PedidoDetalle linea = resolverLinea(lineas, request);
+            PedidoDetalle linea = resolverLinea(lineasProducto, request);
             BigDecimal totalLinea = linea.getVolumenEntregadoM3().add(request.getMetrosEntregados());
             if (totalLinea.compareTo(linea.getVolumenSolicitadoM3()) > 0) {
                 totalLinea = linea.getVolumenSolicitadoM3();
@@ -96,9 +98,9 @@ public class PedidoService {
             linea.setVolumenPendienteM3(linea.getVolumenSolicitadoM3().subtract(totalLinea));
             pedidoDetalleRepository.save(linea);
 
-            BigDecimal sumEntregado = lineas.stream().map(PedidoDetalle::getVolumenEntregadoM3).reduce(BigDecimal.ZERO, BigDecimal::add);
-            BigDecimal sumPendiente = lineas.stream().map(PedidoDetalle::getVolumenPendienteM3).reduce(BigDecimal.ZERO, BigDecimal::add);
-            boolean todasLasLineasCompletas = lineas.stream().allMatch(l -> l.getVolumenPendienteM3().signum() <= 0);
+            BigDecimal sumEntregado = lineasProducto.stream().map(PedidoDetalle::getVolumenEntregadoM3).reduce(BigDecimal.ZERO, BigDecimal::add);
+            BigDecimal sumPendiente = lineasProducto.stream().map(PedidoDetalle::getVolumenPendienteM3).reduce(BigDecimal.ZERO, BigDecimal::add);
+            boolean todasLasLineasCompletas = lineasProducto.stream().allMatch(l -> l.getVolumenPendienteM3().signum() <= 0);
 
             pedido.setVolumenEntregadoM3(sumEntregado);
             pedido.setVolumenPendienteM3(sumPendiente);
@@ -128,7 +130,7 @@ public class PedidoService {
         }
         if (request.getProductoId() != null) {
             return lineas.stream()
-                    .filter(l -> l.getProductoId().equals(request.getProductoId()))
+                    .filter(l -> request.getProductoId().equals(l.getProductoId()))
                     .findFirst()
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "El pedido no tiene una linea para el producto " + request.getProductoId()));
@@ -185,7 +187,6 @@ public class PedidoService {
                 .plantaId(pedido.getPlantaId())
                 .asesorId(pedido.getAsesor() != null ? pedido.getAsesor().getId() : null)
                 .asesorNombre(pedido.getAsesor() != null ? pedido.getAsesor().getNombre() : null)
-                .productoId(pedido.getProductoId())
                 .volumenSolicitadoM3(pedido.getVolumenSolicitadoM3())
                 .volumenEntregadoM3(pedido.getVolumenEntregadoM3())
                 .volumenPendienteM3(pedido.getVolumenPendienteM3())
@@ -206,12 +207,14 @@ public class PedidoService {
     private PedidoItemResponse toItemResponse(PedidoDetalle linea) {
         return PedidoItemResponse.builder()
                 .id(linea.getId())
+                .tipoLinea(linea.getTipoLinea())
                 .productoId(linea.getProductoId())
                 .volumenSolicitadoM3(linea.getVolumenSolicitadoM3())
                 .volumenEntregadoM3(linea.getVolumenEntregadoM3())
                 .volumenPendienteM3(linea.getVolumenPendienteM3())
                 .precioUnitario(linea.getPrecioUnitario())
                 .precioTotal(linea.getPrecioTotal())
+                .descripcion(linea.getDescripcion())
                 .build();
     }
 }

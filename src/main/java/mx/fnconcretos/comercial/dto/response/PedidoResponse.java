@@ -26,9 +26,7 @@ public class PedidoResponse {
     private Long asesorId;
     private String asesorNombre;
 
-    /** Primer producto de "productos"; se conserva por compatibilidad. */
-    private Long productoId;
-    /** Agregados de todas las lineas de "productos"; se conservan por compatibilidad. */
+    /** Agregados de las lineas tipo 'producto' de "productos" (bombeo/flete_vacio no cuentan). */
     private BigDecimal volumenSolicitadoM3;
     private BigDecimal volumenEntregadoM3;
     private BigDecimal volumenPendienteM3;

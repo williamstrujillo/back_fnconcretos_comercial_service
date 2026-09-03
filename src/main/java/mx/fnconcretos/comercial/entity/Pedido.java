@@ -53,10 +53,7 @@ public class Pedido {
     @JoinColumn(name = "asesor_id")
     private AsesorComercial asesor;
 
-    /** Producto en catalogo-service; solo el id */
-    @Column(name = "producto_id")
-    private Long productoId;
-
+    /** Suma del volumen de las lineas tipo 'producto' en pedido_detalle; el desglose real vive ahi. */
     @Column(name = "volumen_solicitado_m3", nullable = false, precision = 10, scale = 2)
     private BigDecimal volumenSolicitadoM3;
 
