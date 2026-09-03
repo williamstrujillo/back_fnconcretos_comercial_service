@@ -26,9 +26,7 @@ public class CotizacionResponse {
     private Long asesorId;
     private String asesorNombre;
 
-    /** Primer producto de "productos"; se conserva por compatibilidad. */
-    private Long productoId;
-    /** Suma del volumen de todas las lineas de "productos"; se conserva por compatibilidad. */
+    /** Suma del volumen de las lineas tipo 'producto' de "productos" (bombeo/flete_vacio no cuentan). */
     private BigDecimal volumenM3;
     /** Desglose real por producto (puede tener 1 o mas lineas). */
     private List<CotizacionItemResponse> productos;

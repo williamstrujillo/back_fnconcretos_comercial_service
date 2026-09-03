@@ -32,9 +32,14 @@ public class PedidoDetalle {
     @JoinColumn(name = "pedido_id", nullable = false)
     private Pedido pedido;
 
-    /** Producto en catalogo-service; solo el id */
-    @Column(name = "producto_id", nullable = false)
+    /** Producto en catalogo-service; solo aplica cuando tipoLinea=producto */
+    @Column(name = "producto_id")
     private Long productoId;
+
+    /** producto, bombeo, flete_vacio, otro */
+    @Column(name = "tipo_linea", nullable = false, length = 20)
+    @Builder.Default
+    private String tipoLinea = "producto";
 
     @Column(name = "volumen_solicitado_m3", nullable = false, precision = 10, scale = 2)
     private BigDecimal volumenSolicitadoM3;
@@ -54,4 +59,8 @@ public class PedidoDetalle {
     @Column(name = "precio_total", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal precioTotal = BigDecimal.ZERO;
+
+    /** etiqueta libre para lineas que no son producto, ej. "Bombeo", "Flete por vacio" */
+    @Column(name = "descripcion", length = 120)
+    private String descripcion;
 }

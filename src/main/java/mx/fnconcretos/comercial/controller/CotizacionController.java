@@ -12,6 +12,7 @@ import mx.fnconcretos.comercial.dto.response.CotizacionResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
 import mx.fnconcretos.comercial.security.JwtPrincipal;
 import mx.fnconcretos.comercial.service.CotizacionService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -37,8 +38,9 @@ public class CotizacionController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Generar cotizacion; un descuento mayor al limite por forma de pago requiere el permiso cotizaciones.aplicar_descuento_especial")
-    public CotizacionResponse crear(@Valid @RequestBody CotizacionRequest request, @AuthenticationPrincipal JwtPrincipal principal) {
-        return cotizacionService.crear(request, principal);
+    public CotizacionResponse crear(@Valid @RequestBody CotizacionRequest request, @AuthenticationPrincipal JwtPrincipal principal,
+                                     @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return cotizacionService.crear(request, principal, authorization);
     }
 
     @GetMapping("/{id}")
@@ -50,8 +52,9 @@ public class CotizacionController {
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar una cotizacion (solo mientras no este convertida a pedido)")
     public CotizacionResponse actualizar(@PathVariable Long id, @Valid @RequestBody CotizacionRequest request,
-                                          @AuthenticationPrincipal JwtPrincipal principal) {
-        return cotizacionService.actualizar(id, request, principal);
+                                          @AuthenticationPrincipal JwtPrincipal principal,
+                                          @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return cotizacionService.actualizar(id, request, principal, authorization);
     }
 
     @PatchMapping("/{id}/estatus")

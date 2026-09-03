@@ -13,8 +13,10 @@ import java.math.BigDecimal;
 @Builder
 public class CotizacionItemResponse {
     private Long id;
+    private String tipoLinea;
     private Long productoId;
     private BigDecimal volumenM3;
     private BigDecimal precioUnitario;
     private BigDecimal precioTotal;
+    private String descripcion;
 }
