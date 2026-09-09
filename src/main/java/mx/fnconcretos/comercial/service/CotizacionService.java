@@ -291,19 +291,20 @@ public class CotizacionService {
                         .build());
 
                 BigDecimal capacidad = tarifas.getCapacidadReferenciaM3();
-                if (capacidad != null && capacidad.signum() > 0) {
-                    BigDecimal resto = volumen.remainder(capacidad);
-                    if (resto.signum() > 0) {
-                        BigDecimal vacio = capacidad.subtract(resto);
-                        BigDecimal precioVacio = tarifas.getPrecioPorM3Vacio() != null ? tarifas.getPrecioPorM3Vacio() : BigDecimal.ZERO;
-                        lineas.add(CotizacionDetalle.builder()
-                                .tipoLinea("flete_vacio")
-                                .volumenM3(vacio)
-                                .precioUnitario(precioVacio)
-                                .precioTotal(vacio.multiply(precioVacio).setScale(2, RoundingMode.HALF_UP))
-                                .descripcion("Flete por vacio")
-                                .build());
-                    }
+                // Solo se cobra vacio si el pedido completo NO alcanza la capacidad de
+                // referencia (ej. 5m3 de 7m3 -> vacio de 2m3). Un pedido de 20m3 no genera
+                // vacio aunque el ultimo viaje parcial no llene la olla: el cargo es por
+                // pedido chico, no por como se reparta en viajes.
+                if (capacidad != null && capacidad.signum() > 0 && volumen.compareTo(capacidad) < 0) {
+                    BigDecimal vacio = capacidad.subtract(volumen);
+                    BigDecimal precioVacio = tarifas.getPrecioPorM3Vacio() != null ? tarifas.getPrecioPorM3Vacio() : BigDecimal.ZERO;
+                    lineas.add(CotizacionDetalle.builder()
+                            .tipoLinea("flete_vacio")
+                            .volumenM3(vacio)
+                            .precioUnitario(precioVacio)
+                            .precioTotal(vacio.multiply(precioVacio).setScale(2, RoundingMode.HALF_UP))
+                            .descripcion("Flete por vacio")
+                            .build());
                 }
             } else if ("bombeo".equals(tipo)) {
                 BigDecimal volumen = item.getVolumenM3() != null ? item.getVolumenM3() : volumenTotalProducto;
