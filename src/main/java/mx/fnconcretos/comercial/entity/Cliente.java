@@ -61,6 +61,16 @@ public class Cliente {
     @JoinColumn(name = "asesor_asignado_id")
     private AsesorComercial asesorAsignado;
 
+    /** asignado (la empresa reparte la cuenta, comision fija), prospectado (el asesor lo consiguio, comision negociada) */
+    @Column(name = "origen_captacion", nullable = false, length = 20)
+    @Builder.Default
+    private String origenCaptacion = "asignado";
+
+    /** % de comision sobre el importe antes de IVA; fijo en 1.00 si origenCaptacion=asignado, negociado (>=1.00) si prospectado */
+    @Column(name = "porcentaje_comision", nullable = false, precision = 5, scale = 2)
+    @Builder.Default
+    private BigDecimal porcentajeComision = new BigDecimal("1.00");
+
     @Column(name = "limite_credito", precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal limiteCredito = BigDecimal.ZERO;

@@ -29,4 +29,10 @@ public class ClienteRequest {
     private Long asesorAsignadoId;
     private BigDecimal limiteCredito;
     private Integer diasCredito;
+
+    /** asignado (default), prospectado */
+    private String origenCaptacion;
+
+    /** % de comision antes de IVA; si se omite: 1.00 si asignado, o el que ya tuviera si se esta actualizando */
+    private BigDecimal porcentajeComision;
 }

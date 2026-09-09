@@ -26,6 +26,8 @@ public class ClienteResponse {
     private String asesorAsignadoNombre;
     private BigDecimal limiteCredito;
     private Integer diasCredito;
+    private String origenCaptacion;
+    private BigDecimal porcentajeComision;
     private String estatus;
     private LocalDateTime createdAt;
 }
