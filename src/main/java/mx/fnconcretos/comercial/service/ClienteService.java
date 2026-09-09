@@ -51,6 +51,8 @@ public class ClienteService {
             throw new ConflictException("Ya existe un cliente con numero " + request.getNumeroCliente());
         }
 
+        String origenCaptacion = request.getOrigenCaptacion() != null ? request.getOrigenCaptacion() : "asignado";
+
         Cliente cliente = Cliente.builder()
                 .numeroCliente(request.getNumeroCliente())
                 .nombre(request.getNombre())
@@ -63,6 +65,8 @@ public class ClienteService {
                 .asesorAsignado(resolverAsesor(request.getAsesorAsignadoId()))
                 .limiteCredito(request.getLimiteCredito() != null ? request.getLimiteCredito() : BigDecimal.ZERO)
                 .diasCredito(request.getDiasCredito() != null ? request.getDiasCredito() : 0)
+                .origenCaptacion(origenCaptacion)
+                .porcentajeComision(resolverPorcentajeComision(origenCaptacion, request.getPorcentajeComision()))
                 .build();
 
         return toResponse(clienteRepository.save(cliente));
@@ -93,8 +97,28 @@ public class ClienteService {
         cliente.setAsesorAsignado(resolverAsesor(request.getAsesorAsignadoId()));
         if (request.getLimiteCredito() != null) cliente.setLimiteCredito(request.getLimiteCredito());
         if (request.getDiasCredito() != null) cliente.setDiasCredito(request.getDiasCredito());
+        if (request.getOrigenCaptacion() != null) cliente.setOrigenCaptacion(request.getOrigenCaptacion());
+        cliente.setPorcentajeComision(resolverPorcentajeComision(cliente.getOrigenCaptacion(), request.getPorcentajeComision()));
 
         return toResponse(clienteRepository.save(cliente));
+    }
+
+    /**
+     * asignado: comision fija en 1.00%, no negociable. prospectado: comision negociada,
+     * pero nunca menor a 1.00%.
+     */
+    private BigDecimal resolverPorcentajeComision(String origenCaptacion, BigDecimal porcentajeSolicitado) {
+        if ("asignado".equals(origenCaptacion)) {
+            return new BigDecimal("1.00");
+        }
+        if ("prospectado".equals(origenCaptacion)) {
+            BigDecimal porcentaje = porcentajeSolicitado != null ? porcentajeSolicitado : new BigDecimal("1.00");
+            if (porcentaje.compareTo(new BigDecimal("1.00")) < 0) {
+                throw new IllegalArgumentException("El porcentaje de comision para un cliente prospectado debe ser de al menos 1.00%");
+            }
+            return porcentaje;
+        }
+        throw new IllegalArgumentException("origenCaptacion debe ser 'asignado' o 'prospectado'");
     }
 
     @Transactional
@@ -140,6 +164,8 @@ public class ClienteService {
                 .asesorAsignadoNombre(cliente.getAsesorAsignado() != null ? cliente.getAsesorAsignado().getNombre() : null)
                 .limiteCredito(cliente.getLimiteCredito())
                 .diasCredito(cliente.getDiasCredito())
+                .origenCaptacion(cliente.getOrigenCaptacion())
+                .porcentajeComision(cliente.getPorcentajeComision())
                 .estatus(cliente.getEstatus())
                 .createdAt(cliente.getCreatedAt())
                 .build();
