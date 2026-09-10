@@ -9,6 +9,7 @@ import mx.fnconcretos.comercial.dto.request.AutorizarRequest;
 import mx.fnconcretos.comercial.dto.response.AutorizacionResponse;
 import mx.fnconcretos.comercial.security.JwtPrincipal;
 import mx.fnconcretos.comercial.service.AutorizacionService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -34,15 +35,17 @@ public class AutorizacionController {
     @PreAuthorize("hasAuthority('pedidos.autorizar_credito')")
     @Operation(summary = "Autorizar o rechazar el pago/credito del pedido; requiere permiso pedidos.autorizar_credito")
     public AutorizacionResponse autorizarPago(@PathVariable Long pedidoId, @Valid @RequestBody AutorizarRequest request,
-                                               @AuthenticationPrincipal JwtPrincipal principal) {
-        return autorizacionService.autorizarPago(pedidoId, request, principal.usuarioId());
+                                               @AuthenticationPrincipal JwtPrincipal principal,
+                                               @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return autorizacionService.autorizarPago(pedidoId, request, principal.usuarioId(), authorization);
     }
 
     @PostMapping("/logistica")
     @PreAuthorize("hasAuthority('pedidos.autorizar_logistica')")
     @Operation(summary = "Autorizar o rechazar la logistica del pedido; requiere permiso pedidos.autorizar_logistica")
     public AutorizacionResponse autorizarLogistica(@PathVariable Long pedidoId, @Valid @RequestBody AutorizarRequest request,
-                                                    @AuthenticationPrincipal JwtPrincipal principal) {
-        return autorizacionService.autorizarLogistica(pedidoId, request, principal.usuarioId());
+                                                    @AuthenticationPrincipal JwtPrincipal principal,
+                                                    @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return autorizacionService.autorizarLogistica(pedidoId, request, principal.usuarioId(), authorization);
     }
 }

@@ -1,6 +1,8 @@
 package mx.fnconcretos.comercial.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import mx.fnconcretos.comercial.client.NotificacionClient;
 import mx.fnconcretos.comercial.dto.request.PedidoUpdateRequest;
 import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
 import mx.fnconcretos.comercial.dto.response.AutorizacionResponse;
@@ -23,6 +25,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PedidoService {
@@ -32,6 +35,7 @@ public class PedidoService {
     private final PedidoRepository pedidoRepository;
     private final PedidoDetalleRepository pedidoDetalleRepository;
     private final PedidoAutorizacionRepository autorizacionRepository;
+    private final NotificacionClient notificacionClient;
 
     @Transactional(readOnly = true)
     public List<PedidoResponse> listar(Long clienteId, String estatusGeneral) {
@@ -75,7 +79,7 @@ public class PedidoService {
      * Acumula el volumen entregado y avanza estatusGeneral a parcial/completo.
      */
     @Transactional
-    public PedidoResponse registrarEntrega(Long id, RegistrarEntregaRequest request) {
+    public PedidoResponse registrarEntrega(Long id, RegistrarEntregaRequest request, String bearerToken) {
         Pedido pedido = buscarOFallar(id);
         if (!ESTATUS_PERMITEN_ENTREGA.contains(pedido.getEstatusGeneral())) {
             throw new EstadoInvalidoException("El pedido " + id + " no esta en un estatus que permita registrar entregas (estatus actual: "
@@ -107,7 +111,23 @@ public class PedidoService {
             pedido.setEstatusGeneral(todasLasLineasCompletas ? "completo" : "parcial");
         }
 
-        return toResponse(pedidoRepository.save(pedido));
+        Pedido guardado = pedidoRepository.save(pedido);
+        if ("completo".equals(guardado.getEstatusGeneral())) {
+            notificarAsesor(guardado, bearerToken);
+        }
+        return toResponse(guardado);
+    }
+
+    private void notificarAsesor(Pedido pedido, String bearerToken) {
+        if (pedido.getAsesor() == null || pedido.getAsesor().getUsuarioId() == null) {
+            return;
+        }
+        try {
+            notificacionClient.crear(pedido.getAsesor().getUsuarioId(), "pedido", "Pedido entregado",
+                    "El pedido " + pedido.getFolio() + " ya se entrego por completo.", "pedido", pedido.getId(), bearerToken);
+        } catch (Exception e) {
+            log.warn("No se pudo notificar al asesor del pedido {}: {}", pedido.getId(), e.getMessage());
+        }
     }
 
     private void acumularEntregaEnEncabezado(Pedido pedido, BigDecimal metrosEntregados) {
