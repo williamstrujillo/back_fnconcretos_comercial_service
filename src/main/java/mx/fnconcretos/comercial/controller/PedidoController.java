@@ -10,6 +10,7 @@ import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
 import mx.fnconcretos.comercial.dto.response.AvancePedidoResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
 import mx.fnconcretos.comercial.service.PedidoService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -51,7 +52,8 @@ public class PedidoController {
     @PatchMapping("/{id}/registrar-entrega")
     @Operation(summary = "Acumular el volumen entregado de una remision y avanzar estatusGeneral a parcial/completo. "
             + "Uso interno: lo invoca operaciones-service al firmar una remision, no pensado para llamarse desde la UI directamente.")
-    public PedidoResponse registrarEntrega(@PathVariable Long id, @Valid @RequestBody RegistrarEntregaRequest request) {
-        return pedidoService.registrarEntrega(id, request);
+    public PedidoResponse registrarEntrega(@PathVariable Long id, @Valid @RequestBody RegistrarEntregaRequest request,
+                                            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return pedidoService.registrarEntrega(id, request, authorization);
     }
 }
