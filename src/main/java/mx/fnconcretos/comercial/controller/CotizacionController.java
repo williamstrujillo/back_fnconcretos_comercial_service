@@ -10,6 +10,7 @@ import mx.fnconcretos.comercial.dto.request.CotizacionRequest;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
 import mx.fnconcretos.comercial.dto.response.CotizacionResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
+import mx.fnconcretos.comercial.dto.response.WhatsAppEnvioResponse;
 import mx.fnconcretos.comercial.security.JwtPrincipal;
 import mx.fnconcretos.comercial.service.CotizacionService;
 import org.springframework.http.HttpHeaders;
@@ -75,5 +76,11 @@ public class CotizacionController {
     @Operation(summary = "Convertir una cotizacion en estatus 'listo' en un pedido formal")
     public PedidoResponse convertirAPedido(@PathVariable Long id, @Valid @RequestBody ConvertirPedidoRequest request) {
         return cotizacionService.convertirAPedido(id, request);
+    }
+
+    @PostMapping("/{id}/enviar-whatsapp")
+    @Operation(summary = "Notificar al cliente por WhatsApp que su cotizacion esta lista (plantilla aprobada 'cotizacion_lista')")
+    public WhatsAppEnvioResponse enviarWhatsApp(@PathVariable Long id) {
+        return cotizacionService.enviarWhatsApp(id);
     }
 }
