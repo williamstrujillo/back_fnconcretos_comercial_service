@@ -2,6 +2,7 @@ package mx.fnconcretos.comercial.service;
 
 import lombok.RequiredArgsConstructor;
 import mx.fnconcretos.comercial.client.CatalogoClient;
+import mx.fnconcretos.comercial.client.WhatsAppClient;
 import mx.fnconcretos.comercial.dto.request.CotizacionItemRequest;
 import mx.fnconcretos.comercial.dto.request.CotizacionRequest;
 import mx.fnconcretos.comercial.dto.request.ConvertirPedidoRequest;
@@ -10,6 +11,7 @@ import mx.fnconcretos.comercial.dto.response.CotizacionItemResponse;
 import mx.fnconcretos.comercial.dto.response.CotizacionResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoItemResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
+import mx.fnconcretos.comercial.dto.response.WhatsAppEnvioResponse;
 import mx.fnconcretos.comercial.entity.AsesorComercial;
 import mx.fnconcretos.comercial.entity.Cliente;
 import mx.fnconcretos.comercial.entity.ContactoCliente;
@@ -51,6 +53,7 @@ public class CotizacionService {
     private final ContactoClienteRepository contactoClienteRepository;
     private final AsesorComercialService asesorService;
     private final CatalogoClient catalogoClient;
+    private final WhatsAppClient whatsAppClient;
 
     @Value("${negocio.descuento.max-efectivo}")
     private BigDecimal descuentoMaxEfectivo;
@@ -115,6 +118,34 @@ public class CotizacionService {
     @Transactional(readOnly = true)
     public CotizacionResponse obtener(Long id) {
         return toResponse(buscarOFallar(id));
+    }
+
+    /**
+     * Notifica al cliente por WhatsApp que su cotizacion ya esta lista, usando la plantilla
+     * aprobada por Meta "cotizacion_lista" (es_MX). Disparo manual (boton "Enviar por WhatsApp" en
+     * la ficha de cotizacion) — no automatico, para que el asesor decida el momento.
+     */
+    @Transactional(readOnly = true)
+    public WhatsAppEnvioResponse enviarWhatsApp(Long id) {
+        CotizacionResponse cotizacion = obtener(id);
+        Cliente cliente = clienteService.buscarOFallar(cotizacion.getClienteId());
+        if (cliente.getTelefono() == null || cliente.getTelefono().isBlank()) {
+            throw new EstadoInvalidoException("El cliente no tiene telefono registrado");
+        }
+
+        List<String> parametros = List.of(
+                cotizacion.getClienteNombre() != null ? cotizacion.getClienteNombre() : cliente.getNombre(),
+                cotizacion.getFolio(),
+                formatearMonto(cotizacion.getMontoTotal()),
+                cotizacion.getAsesorNombre() != null ? cotizacion.getAsesorNombre() : "—"
+        );
+        whatsAppClient.enviarPlantilla(cliente.getTelefono(), "cotizacion_lista", "es_MX", parametros);
+
+        return WhatsAppEnvioResponse.builder().enviado(true).telefono(cliente.getTelefono()).build();
+    }
+
+    private String formatearMonto(BigDecimal monto) {
+        return monto == null ? "0.00" : String.format("%,.2f", monto);
     }
 
     @Transactional
