@@ -3,8 +3,11 @@ package mx.fnconcretos.comercial.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mx.fnconcretos.comercial.client.NotificacionClient;
+import mx.fnconcretos.comercial.client.OperacionesClient;
+import mx.fnconcretos.comercial.client.WhatsAppClient;
 import mx.fnconcretos.comercial.dto.request.AutorizarRequest;
 import mx.fnconcretos.comercial.dto.response.AutorizacionResponse;
+import mx.fnconcretos.comercial.entity.Cliente;
 import mx.fnconcretos.comercial.entity.Pedido;
 import mx.fnconcretos.comercial.entity.PedidoAutorizacion;
 import mx.fnconcretos.comercial.exception.EstadoInvalidoException;
@@ -13,7 +16,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 @Slf4j
 @Service
@@ -22,10 +27,14 @@ public class AutorizacionService {
 
     private static final String APROBADO = "aprobado";
     private static final String RECHAZADO = "rechazado";
+    private static final Locale LOCALE_MX = new Locale("es", "MX");
+    private static final DateTimeFormatter FORMATO_FECHA_ENTREGA = DateTimeFormatter.ofPattern("d 'de' MMMM", LOCALE_MX);
 
     private final PedidoAutorizacionRepository autorizacionRepository;
     private final PedidoService pedidoService;
     private final NotificacionClient notificacionClient;
+    private final WhatsAppClient whatsAppClient;
+    private final OperacionesClient operacionesClient;
 
     @Transactional(readOnly = true)
     public List<AutorizacionResponse> listarPorPedido(Long pedidoId) {
@@ -74,6 +83,7 @@ public class AutorizacionService {
             pedido.setEstatusGeneral("autorizado");
             notificarAsesor(pedido, "Pedido autorizado",
                     "El pedido " + pedido.getFolio() + " ya quedo autorizado y listo para programar entrega.", bearerToken);
+            notificarClienteConfirmacion(pedido, bearerToken);
         } else {
             pedido.setEstatusLogisticaAutorizacion(RECHAZADO);
             pedido.setEstatusGeneral("rechazado");
@@ -95,6 +105,24 @@ public class AutorizacionService {
                     "pedido", pedido.getId(), bearerToken);
         } catch (Exception e) {
             log.warn("No se pudo notificar al asesor del pedido {}: {}", pedido.getId(), e.getMessage());
+        }
+    }
+
+    /** Envia el WhatsApp de "pedido confirmado" al cliente, con boton de rastreo. Nunca bloquea la autorizacion. */
+    private void notificarClienteConfirmacion(Pedido pedido, String bearerToken) {
+        Cliente cliente = pedido.getCliente();
+        if (cliente == null || cliente.getTelefono() == null || cliente.getTelefono().isBlank()) {
+            return;
+        }
+        try {
+            String token = operacionesClient.obtenerOCrearTokenSeguimiento(pedido.getId(), bearerToken);
+            String fechaEntrega = pedido.getFechaProgramada() != null
+                    ? pedido.getFechaProgramada().format(FORMATO_FECHA_ENTREGA)
+                    : "por confirmar";
+            whatsAppClient.enviarPlantilla(cliente.getTelefono(), "pedido_confirmado", "es_MX",
+                    List.of(cliente.getNombre(), pedido.getFolio(), fechaEntrega), token);
+        } catch (Exception e) {
+            log.warn("No se pudo enviar el WhatsApp de pedido confirmado al cliente del pedido {}: {}", pedido.getId(), e.getMessage());
         }
     }
 

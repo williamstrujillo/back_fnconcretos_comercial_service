@@ -48,19 +48,42 @@ public class WhatsAppClient {
      * {{2}}... del cuerpo de la plantilla (todas de tipo texto).
      */
     public void enviarPlantilla(String telefonoDestino, String nombrePlantilla, String idiomaCodigo, List<String> parametros) {
+        enviarPlantilla(telefonoDestino, nombrePlantilla, idiomaCodigo, parametros, null);
+    }
+
+    /**
+     * Igual que {@link #enviarPlantilla(String, String, String, List)} pero para plantillas que
+     * ademas tienen un boton tipo URL con sufijo dinamico (ej. "https://fnconcretos.app/rastreo/{{1}}").
+     * `parametroBoton` llena esa variable del boton (index 0, unico boton de la plantilla).
+     */
+    public void enviarPlantilla(String telefonoDestino, String nombrePlantilla, String idiomaCodigo,
+                                 List<String> parametros, String parametroBoton) {
         if (phoneNumberId == null || phoneNumberId.isBlank() || accessToken == null || accessToken.isBlank()) {
             throw new IllegalStateException("WhatsApp no esta configurado (WHATSAPP_PHONE_NUMBER_ID/WHATSAPP_ACCESS_TOKEN)");
         }
 
-        Map<String, Object> template = new HashMap<>();
-        template.put("name", nombrePlantilla);
-        template.put("language", Map.of("code", idiomaCodigo));
+        List<Map<String, Object>> componentes = new ArrayList<>();
         if (parametros != null && !parametros.isEmpty()) {
             List<Map<String, Object>> valores = new ArrayList<>();
             for (String p : parametros) {
                 valores.add(Map.of("type", "text", "text", p == null ? "" : p));
             }
-            template.put("components", List.of(Map.of("type", "body", "parameters", valores)));
+            componentes.add(Map.of("type", "body", "parameters", valores));
+        }
+        if (parametroBoton != null && !parametroBoton.isBlank()) {
+            Map<String, Object> boton = new HashMap<>();
+            boton.put("type", "button");
+            boton.put("sub_type", "url");
+            boton.put("index", "0");
+            boton.put("parameters", List.of(Map.of("type", "text", "text", parametroBoton)));
+            componentes.add(boton);
+        }
+
+        Map<String, Object> template = new HashMap<>();
+        template.put("name", nombrePlantilla);
+        template.put("language", Map.of("code", idiomaCodigo));
+        if (!componentes.isEmpty()) {
+            template.put("components", componentes);
         }
 
         Map<String, Object> body = new HashMap<>();

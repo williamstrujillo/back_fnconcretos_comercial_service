@@ -1,6 +1,7 @@
 package mx.fnconcretos.comercial.config;
 
 import lombok.RequiredArgsConstructor;
+import mx.fnconcretos.comercial.security.InternalServiceKeyFilter;
 import mx.fnconcretos.comercial.security.JwtAuthenticationFilter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +25,7 @@ import java.util.List;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final InternalServiceKeyFilter internalServiceKeyFilter;
 
     private static final String[] PUBLIC_ENDPOINTS = {
             "/v3/api-docs/**",
@@ -41,7 +43,8 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .anyRequest().authenticated()
                 )
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(internalServiceKeyFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

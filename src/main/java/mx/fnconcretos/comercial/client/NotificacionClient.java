@@ -20,11 +20,14 @@ import java.util.Map;
 public class NotificacionClient {
 
     private final RestClient restClient;
+    private final String claveServicioInterno;
 
-    public NotificacionClient(@Value("${auth-service.base-url}") String authServiceBaseUrl) {
+    public NotificacionClient(@Value("${auth-service.base-url}") String authServiceBaseUrl,
+                               @Value("${internal.service-key}") String claveServicioInterno) {
         this.restClient = RestClient.builder()
                 .baseUrl(authServiceBaseUrl)
                 .build();
+        this.claveServicioInterno = claveServicioInterno;
     }
 
     /** bearerToken debe incluir el prefijo "Bearer ". */
@@ -41,6 +44,7 @@ public class NotificacionClient {
         restClient.post()
                 .uri("/notificaciones")
                 .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .header("X-Internal-Service-Key", claveServicioInterno)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(body)
                 .retrieve()
