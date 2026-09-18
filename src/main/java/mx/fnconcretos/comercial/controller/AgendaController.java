@@ -9,10 +9,12 @@ import mx.fnconcretos.comercial.dto.request.AgendaRequest;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
 import mx.fnconcretos.comercial.dto.response.AgendaResponse;
 import mx.fnconcretos.comercial.dto.response.RutaDiariaResponse;
+import mx.fnconcretos.comercial.security.JwtPrincipal;
 import mx.fnconcretos.comercial.service.AgendaService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -42,28 +44,30 @@ public class AgendaController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Obtener detalle de una actividad de agenda")
-    public AgendaResponse obtener(@PathVariable Long id) {
-        return agendaService.obtener(id);
+    @Operation(summary = "Obtener detalle de una actividad de agenda; solo el propio asesor o Direccion")
+    public AgendaResponse obtener(@PathVariable Long id, @AuthenticationPrincipal JwtPrincipal principal) {
+        return agendaService.obtener(id, principal);
     }
 
     @PatchMapping("/{id}/estatus")
     @PreAuthorize("hasAuthority('agenda.administrar')")
-    @Operation(summary = "Marcar una actividad como completada/cancelada; requiere permiso agenda.administrar")
-    public AgendaResponse cambiarEstatus(@PathVariable Long id, @Valid @RequestBody EstatusRequest request) {
-        return agendaService.cambiarEstatus(id, request);
+    @Operation(summary = "Marcar una actividad como completada/cancelada; requiere permiso agenda.administrar y ser el propio asesor (o Direccion)")
+    public AgendaResponse cambiarEstatus(@PathVariable Long id, @Valid @RequestBody EstatusRequest request,
+                                          @AuthenticationPrincipal JwtPrincipal principal) {
+        return agendaService.cambiarEstatus(id, request, principal);
     }
 
     @GetMapping("/ruta-diaria")
-    @Operation(summary = "Ruta/agenda del dia de un asesor")
+    @Operation(summary = "Ruta/agenda del dia de un asesor; solo el propio asesor o Direccion pueden consultar la de otro")
     public RutaDiariaResponse rutaDiaria(@RequestParam Long asesorId,
-                                          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
-        return agendaService.rutaDiaria(asesorId, fecha);
+                                          @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+                                          @AuthenticationPrincipal JwtPrincipal principal) {
+        return agendaService.rutaDiaria(asesorId, fecha, principal);
     }
 
     @GetMapping("/pendientes-vencidas")
-    @Operation(summary = "Actividades pendientes cuya fecha/hora ya paso, para seguimiento de supervisores")
-    public List<AgendaResponse> pendientesVencidas() {
-        return agendaService.pendientesVencidas();
+    @Operation(summary = "Actividades pendientes cuya fecha/hora ya paso; Direccion ve todas, el resto solo las propias")
+    public List<AgendaResponse> pendientesVencidas(@AuthenticationPrincipal JwtPrincipal principal) {
+        return agendaService.pendientesVencidas(principal);
     }
 }

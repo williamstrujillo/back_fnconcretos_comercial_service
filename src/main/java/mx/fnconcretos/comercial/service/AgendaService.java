@@ -15,7 +15,9 @@ import mx.fnconcretos.comercial.entity.Obra;
 import mx.fnconcretos.comercial.entity.Pedido;
 import mx.fnconcretos.comercial.exception.ResourceNotFoundException;
 import mx.fnconcretos.comercial.repository.AgendaActividadRepository;
+import mx.fnconcretos.comercial.security.JwtPrincipal;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +31,7 @@ import java.util.List;
 public class AgendaService {
 
     private static final List<String> ESTATUS_CERRADOS = List.of("completada", "cancelada");
+    private static final String ROL_DIRECCION = "Direccion";
 
     private final AgendaActividadRepository agendaRepository;
     private final AsesorComercialService asesorService;
@@ -67,19 +70,23 @@ public class AgendaService {
     }
 
     @Transactional(readOnly = true)
-    public AgendaResponse obtener(Long id) {
-        return toResponse(buscarOFallar(id));
+    public AgendaResponse obtener(Long id, JwtPrincipal principal) {
+        AgendaActividad actividad = buscarOFallar(id);
+        verificarAccesoAsesor(actividad.getAsesor().getId(), principal);
+        return toResponse(actividad);
     }
 
     @Transactional
-    public AgendaResponse cambiarEstatus(Long id, EstatusRequest request) {
+    public AgendaResponse cambiarEstatus(Long id, EstatusRequest request, JwtPrincipal principal) {
         AgendaActividad actividad = buscarOFallar(id);
+        verificarAccesoAsesor(actividad.getAsesor().getId(), principal);
         actividad.setEstatus(request.getEstatus());
         return toResponse(agendaRepository.save(actividad));
     }
 
     @Transactional(readOnly = true)
-    public RutaDiariaResponse rutaDiaria(Long asesorId, LocalDate fecha) {
+    public RutaDiariaResponse rutaDiaria(Long asesorId, LocalDate fecha, JwtPrincipal principal) {
+        verificarAccesoAsesor(asesorId, principal);
         AsesorComercial asesor = asesorService.buscarOFallar(asesorId);
 
         LocalDateTime desde = fecha.atStartOfDay();
@@ -103,9 +110,37 @@ public class AgendaService {
     }
 
     @Transactional(readOnly = true)
-    public List<AgendaResponse> pendientesVencidas() {
-        return agendaRepository.findByEstatusNotInAndFechaHoraLessThanOrderByFechaHora(ESTATUS_CERRADOS, LocalDateTime.now())
-                .stream().map(this::toResponse).toList();
+    public List<AgendaResponse> pendientesVencidas(JwtPrincipal principal) {
+        List<AgendaActividad> vencidas = agendaRepository
+                .findByEstatusNotInAndFechaHoraLessThanOrderByFechaHora(ESTATUS_CERRADOS, LocalDateTime.now());
+
+        if (principal != null && !ROL_DIRECCION.equals(principal.rol())) {
+            Long propioAsesorId = asesorService.buscarPorUsuarioId(principal.usuarioId())
+                    .map(AsesorComercial::getId)
+                    .orElse(null);
+            vencidas = vencidas.stream()
+                    .filter(a -> propioAsesorId != null && a.getAsesor().getId().equals(propioAsesorId))
+                    .toList();
+        }
+
+        return vencidas.stream().map(this::toResponse).toList();
+    }
+
+    /**
+     * Direccion puede ver/operar la agenda de cualquier asesor; el resto de roles
+     * solo la propia (resuelta por AsesorComercial.usuarioId == quien esta autenticado).
+     * El usuario pidio explicitamente este comportamiento tras una revision manual
+     * (antes cualquiera con el permiso agenda.administrar podia ver/cambiar la de otros).
+     */
+    private void verificarAccesoAsesor(Long asesorId, JwtPrincipal principal) {
+        if (principal == null || ROL_DIRECCION.equals(principal.rol())) {
+            return;
+        }
+        AsesorComercial propio = asesorService.buscarPorUsuarioId(principal.usuarioId())
+                .orElseThrow(() -> new AccessDeniedException("No tienes una agenda comercial asociada"));
+        if (!propio.getId().equals(asesorId)) {
+            throw new AccessDeniedException("Solo puedes ver o modificar tu propia agenda");
+        }
     }
 
     /**
