@@ -24,6 +24,7 @@ public class AgendaResponse {
     private String tipoActividad;
     private LocalDateTime fechaHora;
     private Integer minutosRecordatorio;
+    private Boolean recordatorioEnviado;
     private String estatus;
     private String observaciones;
     private LocalDateTime createdAt;

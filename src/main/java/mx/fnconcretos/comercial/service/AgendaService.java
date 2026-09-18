@@ -1,6 +1,8 @@
 package mx.fnconcretos.comercial.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import mx.fnconcretos.comercial.client.NotificacionClient;
 import mx.fnconcretos.comercial.dto.request.AgendaRequest;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
 import mx.fnconcretos.comercial.dto.response.AgendaResponse;
@@ -13,6 +15,7 @@ import mx.fnconcretos.comercial.entity.Obra;
 import mx.fnconcretos.comercial.entity.Pedido;
 import mx.fnconcretos.comercial.exception.ResourceNotFoundException;
 import mx.fnconcretos.comercial.repository.AgendaActividadRepository;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +23,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AgendaService {
@@ -32,6 +36,7 @@ public class AgendaService {
     private final ObraService obraService;
     private final CotizacionService cotizacionService;
     private final PedidoService pedidoService;
+    private final NotificacionClient notificacionClient;
 
     @Transactional(readOnly = true)
     public List<AgendaResponse> listarPorCliente(Long clienteId) {
@@ -103,6 +108,56 @@ public class AgendaService {
                 .stream().map(this::toResponse).toList();
     }
 
+    /**
+     * Revisa cada minuto las actividades cuyo momento de recordatorio ya llego
+     * (fechaHora - minutosRecordatorio &lt;= ahora) y dispara el push via
+     * NotificacionClient -- antes minutosRecordatorio se guardaba pero nada lo
+     * usaba. Solo considera actividades de las ultimas 24h para no bombardear
+     * con recordatorios atrasados de actividades viejas sin resolver. Si falla
+     * el envio, no marca recordatorioEnviado para reintentar en el siguiente ciclo.
+     */
+    @Scheduled(fixedRate = 60000)
+    @Transactional
+    public void enviarRecordatoriosPendientes() {
+        LocalDateTime ahora = LocalDateTime.now();
+        List<AgendaActividad> candidatas = agendaRepository
+                .findByEstatusNotInAndRecordatorioEnviadoFalseAndFechaHoraGreaterThanEqual(
+                        ESTATUS_CERRADOS, ahora.minusHours(24));
+
+        for (AgendaActividad actividad : candidatas) {
+            int minutos = actividad.getMinutosRecordatorio() != null ? actividad.getMinutosRecordatorio() : 10;
+            if (actividad.getFechaHora().minusMinutes(minutos).isAfter(ahora)) {
+                continue;
+            }
+            if (actividad.getAsesor().getUsuarioId() == null) {
+                actividad.setRecordatorioEnviado(true);
+                agendaRepository.save(actividad);
+                continue;
+            }
+            try {
+                notificacionClient.crear(
+                        actividad.getAsesor().getUsuarioId(),
+                        "agenda",
+                        "Recordatorio: " + actividad.getTipoActividad(),
+                        mensajeRecordatorio(actividad),
+                        "agenda",
+                        actividad.getId(),
+                        null);
+            } catch (Exception e) {
+                log.warn("No se pudo enviar el recordatorio de la actividad {}: {}", actividad.getId(), e.getMessage());
+                continue;
+            }
+            actividad.setRecordatorioEnviado(true);
+            agendaRepository.save(actividad);
+        }
+    }
+
+    private String mensajeRecordatorio(AgendaActividad actividad) {
+        String cliente = actividad.getCliente() != null ? " con " + actividad.getCliente().getNombre() : "";
+        return "Tienes \"" + actividad.getTipoActividad() + "\"" + cliente + " programada a las "
+                + actividad.getFechaHora().toLocalTime() + ".";
+    }
+
     private AgendaActividad buscarOFallar(Long id) {
         return agendaRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Actividad de agenda no encontrada: " + id));
@@ -122,6 +177,7 @@ public class AgendaService {
                 .tipoActividad(actividad.getTipoActividad())
                 .fechaHora(actividad.getFechaHora())
                 .minutosRecordatorio(actividad.getMinutosRecordatorio())
+                .recordatorioEnviado(actividad.getRecordatorioEnviado())
                 .estatus(actividad.getEstatus())
                 .observaciones(actividad.getObservaciones())
                 .createdAt(actividad.getCreatedAt())

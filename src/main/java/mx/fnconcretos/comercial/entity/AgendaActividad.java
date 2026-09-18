@@ -59,6 +59,10 @@ public class AgendaActividad {
     @Builder.Default
     private Integer minutosRecordatorio = 10;
 
+    @Column(name = "recordatorio_enviado", nullable = false)
+    @Builder.Default
+    private Boolean recordatorioEnviado = false;
+
     @Column(name = "estatus", nullable = false, length = 30)
     @Builder.Default
     private String estatus = "pendiente";

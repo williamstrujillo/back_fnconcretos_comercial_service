@@ -30,7 +30,11 @@ public class NotificacionClient {
         this.claveServicioInterno = claveServicioInterno;
     }
 
-    /** bearerToken debe incluir el prefijo "Bearer ". */
+    /**
+     * bearerToken debe incluir el prefijo "Bearer ". Puede ser null cuando quien dispara la
+     * notificacion es un proceso interno sin usuario real detras (ej. el recordatorio de agenda
+     * programado) -- la clave de servicio interno basta para autenticar en ese caso.
+     */
     public void crear(Long usuarioId, String tipo, String titulo, String mensaje,
                        String referenciaTipo, Long referenciaId, String bearerToken) {
         Map<String, Object> body = new HashMap<>();
@@ -43,8 +47,12 @@ public class NotificacionClient {
 
         restClient.post()
                 .uri("/notificaciones")
-                .header(HttpHeaders.AUTHORIZATION, bearerToken)
-                .header("X-Internal-Service-Key", claveServicioInterno)
+                .headers(headers -> {
+                    if (bearerToken != null) {
+                        headers.set(HttpHeaders.AUTHORIZATION, bearerToken);
+                    }
+                    headers.set("X-Internal-Service-Key", claveServicioInterno);
+                })
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(body)
                 .retrieve()
