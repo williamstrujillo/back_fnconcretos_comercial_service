@@ -153,6 +153,14 @@ public class ObraService {
         return clienteObraRepository.findByObraId(obraId).stream().map(this::toClienteObraResponse).toList();
     }
 
+    @Transactional
+    public void desvincularCliente(Long obraId, Long clienteId) {
+        ClienteObra vinculo = clienteObraRepository.findByClienteIdAndObraId(clienteId, obraId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "El cliente " + clienteId + " no esta vinculado a la obra " + obraId));
+        clienteObraRepository.delete(vinculo);
+    }
+
     protected Obra buscarOFallar(Long id) {
         return obraRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Obra no encontrada: " + id));

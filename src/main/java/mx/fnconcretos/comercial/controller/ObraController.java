@@ -70,4 +70,11 @@ public class ObraController {
     public List<ClienteObraResponse> listarClientesVinculados(@PathVariable Long id) {
         return obraService.listarClientesVinculados(id);
     }
+
+    @DeleteMapping("/{id}/clientes/{clienteId}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Desvincular un cliente de la obra")
+    public void desvincularCliente(@PathVariable Long id, @PathVariable Long clienteId) {
+        obraService.desvincularCliente(id, clienteId);
+    }
 }

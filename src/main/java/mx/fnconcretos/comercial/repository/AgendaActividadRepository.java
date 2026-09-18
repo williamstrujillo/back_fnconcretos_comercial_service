@@ -13,4 +13,7 @@ public interface AgendaActividadRepository extends JpaRepository<AgendaActividad
     List<AgendaActividad> findByClienteIdOrderByFechaHoraDesc(Long clienteId);
 
     List<AgendaActividad> findByEstatusNotInAndFechaHoraLessThanOrderByFechaHora(List<String> estatusCerrados, LocalDateTime ahora);
+
+    List<AgendaActividad> findByEstatusNotInAndRecordatorioEnviadoFalseAndFechaHoraGreaterThanEqual(
+            List<String> estatusCerrados, LocalDateTime desde);
 }

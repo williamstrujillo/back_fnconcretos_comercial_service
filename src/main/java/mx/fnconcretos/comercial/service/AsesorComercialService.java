@@ -109,6 +109,11 @@ public class AsesorComercialService {
                 .orElseThrow(() -> new ResourceNotFoundException("Asesor no encontrado: " + id));
     }
 
+    /** Para resolver "cual es mi propia agenda" a partir del usuario autenticado (JwtPrincipal). */
+    protected java.util.Optional<AsesorComercial> buscarPorUsuarioId(Long usuarioId) {
+        return asesorRepository.findByUsuarioId(usuarioId);
+    }
+
     private AsesorResponse toResponse(AsesorComercial asesor) {
         return AsesorResponse.builder()
                 .id(asesor.getId())
