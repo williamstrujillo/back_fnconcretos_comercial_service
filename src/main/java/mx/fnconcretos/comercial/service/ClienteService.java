@@ -47,14 +47,17 @@ public class ClienteService {
 
     @Transactional
     public ClienteResponse crear(ClienteRequest request) {
-        if (clienteRepository.existsByNumeroCliente(request.getNumeroCliente())) {
-            throw new ConflictException("Ya existe un cliente con numero " + request.getNumeroCliente());
+        String numeroCliente = request.getNumeroCliente() != null && !request.getNumeroCliente().isBlank()
+                ? request.getNumeroCliente()
+                : generarNumeroCliente();
+        if (clienteRepository.existsByNumeroCliente(numeroCliente)) {
+            throw new ConflictException("Ya existe un cliente con numero " + numeroCliente);
         }
 
         String origenCaptacion = request.getOrigenCaptacion() != null ? request.getOrigenCaptacion() : "asignado";
 
         Cliente cliente = Cliente.builder()
-                .numeroCliente(request.getNumeroCliente())
+                .numeroCliente(numeroCliente)
                 .nombre(request.getNombre())
                 .tipo(request.getTipo() != null ? request.getTipo() : "particular")
                 .rfc(request.getRfc())
@@ -70,6 +73,17 @@ public class ClienteService {
                 .build();
 
         return toResponse(clienteRepository.save(cliente));
+    }
+
+    /** Siguiente folio "CLI-0001", "CLI-0002"... a partir del mayor numero existente con ese formato. */
+    private String generarNumeroCliente() {
+        int max = clienteRepository.findAll().stream()
+                .map(Cliente::getNumeroCliente)
+                .filter(n -> n != null && n.matches("CLI-\\d+"))
+                .mapToInt(n -> Integer.parseInt(n.substring(4)))
+                .max()
+                .orElse(0);
+        return String.format("CLI-%04d", max + 1);
     }
 
     @Transactional(readOnly = true)

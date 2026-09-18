@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class ClienteRequest {
 
-    @NotBlank(message = "El numero de cliente es obligatorio")
+    /** Opcional al crear: se autogenera (CLI-0001, CLI-0002...) si se omite. */
     private String numeroCliente;
 
     @NotBlank(message = "El nombre es obligatorio")
