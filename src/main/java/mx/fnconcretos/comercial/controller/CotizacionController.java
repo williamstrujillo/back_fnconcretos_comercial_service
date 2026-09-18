@@ -79,8 +79,8 @@ public class CotizacionController {
     }
 
     @PostMapping("/{id}/enviar-whatsapp")
-    @Operation(summary = "Notificar al cliente por WhatsApp que su cotizacion esta lista (plantilla aprobada 'cotizacion_lista')")
-    public WhatsAppEnvioResponse enviarWhatsApp(@PathVariable Long id) {
-        return cotizacionService.enviarWhatsApp(id);
+    @Operation(summary = "Notificar al cliente por WhatsApp que su cotizacion esta lista (plantilla aprobada 'cotizacion_lista'), con boton al link publico de la cotizacion")
+    public WhatsAppEnvioResponse enviarWhatsApp(@PathVariable Long id, @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return cotizacionService.enviarWhatsApp(id, authorization);
     }
 }

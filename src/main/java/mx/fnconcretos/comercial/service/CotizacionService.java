@@ -54,6 +54,7 @@ public class CotizacionService {
     private final AsesorComercialService asesorService;
     private final CatalogoClient catalogoClient;
     private final WhatsAppClient whatsAppClient;
+    private final CotizacionCompartidaService cotizacionCompartidaService;
 
     @Value("${negocio.descuento.max-efectivo}")
     private BigDecimal descuentoMaxEfectivo;
@@ -123,15 +124,18 @@ public class CotizacionService {
     /**
      * Notifica al cliente por WhatsApp que su cotizacion ya esta lista, usando la plantilla
      * aprobada por Meta "cotizacion_lista" (es_MX). Disparo manual (boton "Enviar por WhatsApp" en
-     * la ficha de cotizacion) — no automatico, para que el asesor decida el momento.
+     * la ficha de cotizacion) — no automatico, para que el asesor decida el momento. Incluye el
+     * boton con el link publico de la cotizacion (mismo patron que "pedido_confirmado").
      */
-    @Transactional(readOnly = true)
-    public WhatsAppEnvioResponse enviarWhatsApp(Long id) {
+    @Transactional
+    public WhatsAppEnvioResponse enviarWhatsApp(Long id, String bearerToken) {
         CotizacionResponse cotizacion = obtener(id);
         Cliente cliente = clienteService.buscarOFallar(cotizacion.getClienteId());
         if (cliente.getTelefono() == null || cliente.getTelefono().isBlank()) {
             throw new EstadoInvalidoException("El cliente no tiene telefono registrado");
         }
+
+        String tokenCompartido = cotizacionCompartidaService.obtenerOCrearToken(id, bearerToken).getToken();
 
         List<String> parametros = List.of(
                 cotizacion.getClienteNombre() != null ? cotizacion.getClienteNombre() : cliente.getNombre(),
@@ -139,7 +143,7 @@ public class CotizacionService {
                 formatearMonto(cotizacion.getMontoTotal()),
                 cotizacion.getAsesorNombre() != null ? cotizacion.getAsesorNombre() : "—"
         );
-        whatsAppClient.enviarPlantilla(cliente.getTelefono(), "cotizacion_lista", "es_MX", parametros);
+        whatsAppClient.enviarPlantilla(cliente.getTelefono(), "cotizacion_lista", "es_MX", parametros, tokenCompartido);
 
         return WhatsAppEnvioResponse.builder().enviado(true).telefono(cliente.getTelefono()).build();
     }
