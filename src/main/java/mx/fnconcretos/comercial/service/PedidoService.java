@@ -2,6 +2,7 @@ package mx.fnconcretos.comercial.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import mx.fnconcretos.comercial.client.AuthClient;
 import mx.fnconcretos.comercial.client.NotificacionClient;
 import mx.fnconcretos.comercial.dto.request.PedidoUpdateRequest;
 import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
@@ -18,11 +19,14 @@ import mx.fnconcretos.comercial.repository.PedidoAutorizacionRepository;
 import mx.fnconcretos.comercial.repository.PedidoDetalleRepository;
 import mx.fnconcretos.comercial.repository.PedidoRepository;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Slf4j
@@ -32,10 +36,15 @@ public class PedidoService {
 
     private static final List<String> ESTATUS_PERMITEN_ENTREGA = List.of("autorizado", "programado", "parcial");
 
+    /** Dias antes del vencimiento del credito en que se dispara el primer (y unico) aviso. */
+    private static final int DIAS_AVISO_VENCIMIENTO_CREDITO = 3;
+    private static final String ROL_DIRECCION = "Direccion";
+
     private final PedidoRepository pedidoRepository;
     private final PedidoDetalleRepository pedidoDetalleRepository;
     private final PedidoAutorizacionRepository autorizacionRepository;
     private final NotificacionClient notificacionClient;
+    private final AuthClient authClient;
 
     @Transactional(readOnly = true)
     public List<PedidoResponse> listar(Long clienteId, String estatusGeneral) {
@@ -236,5 +245,68 @@ public class PedidoService {
                 .precioTotal(linea.getPrecioTotal())
                 .descripcion(linea.getDescripcion())
                 .build();
+    }
+
+    /**
+     * Recordatorio de vencimiento de credito: una vez al dia, revisa pedidos a credito (no
+     * rechazados, con dias de credito y fecha programada capturados, no avisados todavia) y, si
+     * faltan {@link #DIAS_AVISO_VENCIMIENTO_CREDITO} dias o menos para vencer (incluye ya vencidos,
+     * diasRestantes negativo), notifica al asesor del pedido; si ya esta vencido, notifica ademas a
+     * todos los usuarios del rol Direccion. Se dispara una sola vez por pedido (recordatorioCreditoEnviado).
+     *
+     * Vencimiento = fechaProgramada + diasCredito -- no se guarda, se calcula (mismo criterio que
+     * el vencimiento de ordenes de compra a proveedores en finanzas-service). No verifica si el
+     * pedido ya se liquido de verdad (eso vive en Pago, finanzas-service); si Pagos/Finanzas marca
+     * el pedido como "liquidado" al cobrar, deja de ser candidato aqui.
+     */
+    @Scheduled(cron = "0 0 8 * * *")
+    @Transactional
+    public void enviarRecordatoriosCredito() {
+        List<Pedido> candidatos = pedidoRepository
+                .findByCondicionPagoAndDiasCreditoIsNotNullAndFechaProgramadaIsNotNullAndRecordatorioCreditoEnviadoFalseAndEstatusGeneralNot(
+                        "credito", "rechazado");
+
+        LocalDate hoy = LocalDate.now();
+        for (Pedido pedido : candidatos) {
+            LocalDate vencimiento = pedido.getFechaProgramada().plusDays(pedido.getDiasCredito());
+            long diasRestantes = ChronoUnit.DAYS.between(hoy, vencimiento);
+            if (diasRestantes > DIAS_AVISO_VENCIMIENTO_CREDITO) {
+                continue;
+            }
+
+            boolean vencido = diasRestantes < 0;
+            String titulo = vencido ? "Crédito vencido" : "Crédito por vencer";
+            String mensaje = vencido
+                    ? "El crédito del pedido " + pedido.getFolio() + " venció hace " + (-diasRestantes) + " día(s) (" + vencimiento + ")."
+                    : "El crédito del pedido " + pedido.getFolio() + " vence en " + diasRestantes + " día(s) (" + vencimiento + ").";
+
+            boolean enviado = true;
+
+            if (pedido.getAsesor() != null && pedido.getAsesor().getUsuarioId() != null) {
+                try {
+                    notificacionClient.crear(pedido.getAsesor().getUsuarioId(), "credito", titulo, mensaje, "pedido", pedido.getId(), null);
+                } catch (Exception e) {
+                    log.warn("No se pudo notificar al asesor del pedido {} sobre vencimiento de credito: {}", pedido.getId(), e.getMessage());
+                    enviado = false;
+                }
+            }
+
+            if (vencido) {
+                try {
+                    List<AuthClient.UsuarioInfo> direccion = authClient.listarUsuariosPorRol(ROL_DIRECCION);
+                    for (AuthClient.UsuarioInfo usuario : direccion) {
+                        notificacionClient.crear(usuario.getId(), "credito", titulo, mensaje, "pedido", pedido.getId(), null);
+                    }
+                } catch (Exception e) {
+                    log.warn("No se pudo notificar a Direccion sobre credito vencido del pedido {}: {}", pedido.getId(), e.getMessage());
+                    enviado = false;
+                }
+            }
+
+            if (enviado) {
+                pedido.setRecordatorioCreditoEnviado(true);
+                pedidoRepository.save(pedido);
+            }
+        }
     }
 }

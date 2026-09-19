@@ -12,8 +12,6 @@ import java.math.BigDecimal;
  * Proxy hacia finanzas-service (ClienteEstadoCuentaController, donde vive Pago). Si esa llamada
  * falla, se responde con valores neutros y `disponible=false` en vez de propagar el error -- este
  * dato es informativo, nunca debe bloquear el flujo de cotizar/vender.
- * adeudoVencido/moroso quedan siempre en su valor neutro por ahora: no existe todavia una fecha de
- * vencimiento por pedido/factura para calcularlos honestamente (fase 2 pendiente).
  */
 @Data
 @NoArgsConstructor

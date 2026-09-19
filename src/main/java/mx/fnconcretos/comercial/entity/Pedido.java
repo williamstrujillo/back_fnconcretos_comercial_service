@@ -96,6 +96,12 @@ public class Pedido {
     @Column(name = "motivo_rechazo", length = 255)
     private String motivoRechazo;
 
+    /** Evita reenviar el recordatorio de vencimiento de credito una vez ya avisado -- mismo patron
+     * que AgendaActividad.recordatorioEnviado. */
+    @Column(name = "recordatorio_credito_enviado", nullable = false)
+    @Builder.Default
+    private Boolean recordatorioCreditoEnviado = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
