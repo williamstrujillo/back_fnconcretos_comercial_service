@@ -47,7 +47,7 @@ public class PedidoService {
     private final AuthClient authClient;
 
     @Transactional(readOnly = true)
-    public List<PedidoResponse> listar(Long clienteId, String estatusGeneral) {
+    public List<PedidoResponse> listar(Long clienteId, String estatusGeneral, String q) {
         Specification<Pedido> spec = Specification.where(null);
 
         if (clienteId != null) {
@@ -55,6 +55,10 @@ public class PedidoService {
         }
         if (estatusGeneral != null && !estatusGeneral.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("estatusGeneral"), estatusGeneral));
+        }
+        if (q != null && !q.isBlank()) {
+            String like = "%" + q.toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("folio")), like));
         }
 
         return pedidoRepository.findAll(spec).stream().map(this::toResponse).toList();
