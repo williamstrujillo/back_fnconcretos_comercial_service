@@ -117,7 +117,7 @@ public class CotizacionCompartidaService {
                 .totalVolumen(cotizacion.getVolumenM3())
                 .totales(construirTotales(cotizacion, lineas))
                 .vendedor(construirVendedor(cotizacion))
-                .observaciones(null)
+                .observaciones(cotizacion.getObservaciones())
                 .build();
 
         try {

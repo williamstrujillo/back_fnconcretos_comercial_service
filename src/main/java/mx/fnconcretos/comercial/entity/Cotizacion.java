@@ -95,6 +95,9 @@ public class Cotizacion {
     @JoinColumn(name = "cotizacion_origen_id")
     private Cotizacion cotizacionOrigen;
 
+    @Column(name = "observaciones", length = 250)
+    private String observaciones;
+
     @Column(name = "enviada_whatsapp", nullable = false)
     @Builder.Default
     private Boolean enviadaWhatsapp = false;

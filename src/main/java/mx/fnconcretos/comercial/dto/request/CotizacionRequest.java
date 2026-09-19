@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -46,4 +47,7 @@ public class CotizacionRequest {
 
     @DecimalMin(value = "0.0", message = "El descuento no puede ser negativo")
     private BigDecimal porcentajeDescuento;
+
+    @Size(max = 250, message = "Las observaciones no pueden exceder 250 caracteres")
+    private String observaciones;
 }
