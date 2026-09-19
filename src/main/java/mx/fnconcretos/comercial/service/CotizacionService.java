@@ -107,6 +107,7 @@ public class CotizacionService {
                 .porcentajeDescuento(descuento)
                 .precioUnitario(precioUnitarioPrimero)
                 .precioTotal(precioTotal)
+                .observaciones(request.getObservaciones())
                 .build();
 
         Cotizacion guardada = cotizacionRepository.save(cotizacion);
@@ -181,6 +182,7 @@ public class CotizacionService {
         cotizacion.setPorcentajeDescuento(descuento);
         cotizacion.setPrecioUnitario(precioUnitarioPrimero);
         cotizacion.setPrecioTotal(precioTotal);
+        cotizacion.setObservaciones(request.getObservaciones());
 
         Cotizacion guardada = cotizacionRepository.save(cotizacion);
         cotizacionDetalleRepository.deleteByCotizacionId(guardada.getId());
@@ -219,6 +221,7 @@ public class CotizacionService {
                 .porcentajeDescuento(origen.getPorcentajeDescuento())
                 .precioUnitario(origen.getPrecioUnitario())
                 .precioTotal(origen.getPrecioTotal())
+                .observaciones(origen.getObservaciones())
                 .cotizacionOrigen(origen)
                 .build();
 
@@ -465,6 +468,7 @@ public class CotizacionService {
                 .montoTotal(cotizacion.getPrecioTotal())
                 .estatus(cotizacion.getEstatus())
                 .cotizacionOrigenId(cotizacion.getCotizacionOrigen() != null ? cotizacion.getCotizacionOrigen().getId() : null)
+                .observaciones(cotizacion.getObservaciones())
                 .createdAt(cotizacion.getCreatedAt())
                 .productos(cotizacionDetalleRepository.findByCotizacionId(cotizacion.getId()).stream()
                         .map(this::toItemResponse).toList())

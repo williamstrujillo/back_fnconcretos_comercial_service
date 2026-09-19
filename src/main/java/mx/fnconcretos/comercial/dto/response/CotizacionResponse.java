@@ -40,5 +40,6 @@ public class CotizacionResponse {
     private BigDecimal montoTotal;
     private String estatus;
     private Long cotizacionOrigenId;
+    private String observaciones;
     private LocalDateTime createdAt;
 }
