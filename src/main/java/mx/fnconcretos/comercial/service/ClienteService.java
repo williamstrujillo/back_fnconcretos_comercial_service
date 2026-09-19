@@ -1,6 +1,8 @@
 package mx.fnconcretos.comercial.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import mx.fnconcretos.comercial.client.FinanzasClient;
 import mx.fnconcretos.comercial.dto.request.ClienteRequest;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
 import mx.fnconcretos.comercial.dto.response.ClienteResponse;
@@ -18,12 +20,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ClienteService {
 
     private final ClienteRepository clienteRepository;
     private final AsesorComercialRepository asesorRepository;
+    private final FinanzasClient finanzasClient;
 
     @Transactional(readOnly = true)
     public List<ClienteResponse> listar(String tipo, String estatus, String q) {
@@ -143,13 +147,26 @@ public class ClienteService {
     }
 
     @Transactional(readOnly = true)
-    public EstadoCuentaResponse estadoCuenta(Long id) {
+    public EstadoCuentaResponse estadoCuenta(Long id, String bearerToken) {
         buscarOFallar(id);
-        return EstadoCuentaResponse.builder()
-                .clienteId(id)
-                .disponible(false)
-                .mensaje("finanzas-service aun no esta disponible")
-                .build();
+        try {
+            FinanzasClient.EstadoCuentaClienteInfo info = finanzasClient.obtenerEstadoCuenta(id, bearerToken);
+            return EstadoCuentaResponse.builder()
+                    .clienteId(id)
+                    .disponible(info.isDisponible())
+                    .saldoActual(info.getSaldoActual())
+                    .adeudoVencido(info.getAdeudoVencido())
+                    .anticiposDisponibles(info.getAnticiposDisponibles())
+                    .moroso(info.isMoroso())
+                    .build();
+        } catch (Exception e) {
+            log.warn("No se pudo obtener el estado de cuenta del cliente {} desde finanzas-service: {}", id, e.getMessage());
+            return EstadoCuentaResponse.builder()
+                    .clienteId(id)
+                    .disponible(false)
+                    .mensaje("No se pudo consultar el estado de cuenta en este momento")
+                    .build();
+        }
     }
 
     protected Cliente buscarOFallar(Long id) {

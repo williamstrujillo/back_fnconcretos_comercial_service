@@ -10,6 +10,7 @@ import mx.fnconcretos.comercial.dto.request.EstatusRequest;
 import mx.fnconcretos.comercial.dto.response.ClienteResponse;
 import mx.fnconcretos.comercial.dto.response.EstadoCuentaResponse;
 import mx.fnconcretos.comercial.service.ClienteService;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -58,8 +59,8 @@ public class ClienteController {
     }
 
     @GetMapping("/{id}/estado-cuenta")
-    @Operation(summary = "Estado de cuenta del cliente (proxy hacia finanzas-service; responde disponible=false mientras ese servicio no exista)")
-    public EstadoCuentaResponse estadoCuenta(@PathVariable Long id) {
-        return clienteService.estadoCuenta(id);
+    @Operation(summary = "Estado de cuenta del cliente (proxy hacia finanzas-service)")
+    public EstadoCuentaResponse estadoCuenta(@PathVariable Long id, @RequestHeader(HttpHeaders.AUTHORIZATION) String bearerToken) {
+        return clienteService.estadoCuenta(id, bearerToken);
     }
 }

@@ -9,10 +9,11 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 
 /**
- * Proxy hacia finanzas-service. Mientras ese servicio no exista, este
- * endpoint responde con valores neutros y `disponible=false` para que el
- * contrato ya quede fijo y comercial-service (autorizacion de credito)
- * pueda integrarlo sin cambios cuando finanzas-service este listo.
+ * Proxy hacia finanzas-service (ClienteEstadoCuentaController, donde vive Pago). Si esa llamada
+ * falla, se responde con valores neutros y `disponible=false` en vez de propagar el error -- este
+ * dato es informativo, nunca debe bloquear el flujo de cotizar/vender.
+ * adeudoVencido/moroso quedan siempre en su valor neutro por ahora: no existe todavia una fecha de
+ * vencimiento por pedido/factura para calcularlos honestamente (fase 2 pendiente).
  */
 @Data
 @NoArgsConstructor
