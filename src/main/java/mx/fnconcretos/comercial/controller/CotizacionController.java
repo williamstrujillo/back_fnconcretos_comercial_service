@@ -30,10 +30,11 @@ public class CotizacionController {
     private final CotizacionService cotizacionService;
 
     @GetMapping
-    @Operation(summary = "Buscar cotizaciones por cliente o estatus")
+    @Operation(summary = "Buscar cotizaciones por cliente, estatus o folio (q, coincidencia parcial)")
     public List<CotizacionResponse> listar(@RequestParam(required = false) Long clienteId,
-                                            @RequestParam(required = false) String estatus) {
-        return cotizacionService.listar(clienteId, estatus);
+                                            @RequestParam(required = false) String estatus,
+                                            @RequestParam(required = false) String q) {
+        return cotizacionService.listar(clienteId, estatus, q);
     }
 
     @PostMapping

@@ -63,7 +63,7 @@ public class CotizacionService {
     private BigDecimal descuentoMaxFactura;
 
     @Transactional(readOnly = true)
-    public List<CotizacionResponse> listar(Long clienteId, String estatus) {
+    public List<CotizacionResponse> listar(Long clienteId, String estatus, String q) {
         Specification<Cotizacion> spec = Specification.where(null);
 
         if (clienteId != null) {
@@ -71,6 +71,10 @@ public class CotizacionService {
         }
         if (estatus != null && !estatus.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("estatus"), estatus));
+        }
+        if (q != null && !q.isBlank()) {
+            String like = "%" + q.toLowerCase() + "%";
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("folio")), like));
         }
 
         return cotizacionRepository.findAll(spec).stream().map(this::toResponse).toList();
