@@ -37,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -112,6 +113,9 @@ public class CotizacionService {
                 .precioUnitario(precioUnitarioPrimero)
                 .precioTotal(precioTotal)
                 .observaciones(request.getObservaciones())
+                .creadoPorUsuario(principal != null ? principal.user() : null)
+                .actualizadoPorUsuario(principal != null ? principal.user() : null)
+                .actualizadoEn(LocalDateTime.now())
                 .build();
 
         Cotizacion guardada = cotizacionRepository.save(cotizacion);
@@ -187,6 +191,8 @@ public class CotizacionService {
         cotizacion.setPrecioUnitario(precioUnitarioPrimero);
         cotizacion.setPrecioTotal(precioTotal);
         cotizacion.setObservaciones(request.getObservaciones());
+        cotizacion.setActualizadoPorUsuario(principal != null ? principal.user() : null);
+        cotizacion.setActualizadoEn(LocalDateTime.now());
 
         Cotizacion guardada = cotizacionRepository.save(cotizacion);
         cotizacionDetalleRepository.deleteByCotizacionId(guardada.getId());
@@ -197,19 +203,22 @@ public class CotizacionService {
     }
 
     @Transactional
-    public CotizacionResponse cambiarEstatus(Long id, EstatusRequest request) {
+    public CotizacionResponse cambiarEstatus(Long id, EstatusRequest request, JwtPrincipal principal) {
         Cotizacion cotizacion = buscarOFallar(id);
         if ("convertida".equals(cotizacion.getEstatus())) {
             throw new EstadoInvalidoException("No se puede cambiar el estatus de una cotizacion ya convertida a pedido");
         }
         cotizacion.setEstatus(request.getEstatus());
+        cotizacion.setActualizadoPorUsuario(principal != null ? principal.user() : null);
+        cotizacion.setActualizadoEn(LocalDateTime.now());
         return toResponse(cotizacionRepository.save(cotizacion));
     }
 
     @Transactional
-    public CotizacionResponse duplicar(Long id) {
+    public CotizacionResponse duplicar(Long id, JwtPrincipal principal) {
         Cotizacion origen = buscarOFallar(id);
 
+        String usuario = principal != null ? principal.user() : null;
         Cotizacion copia = Cotizacion.builder()
                 .folio(generarFolio())
                 .cliente(origen.getCliente())
@@ -227,6 +236,9 @@ public class CotizacionService {
                 .precioTotal(origen.getPrecioTotal())
                 .observaciones(origen.getObservaciones())
                 .cotizacionOrigen(origen)
+                .creadoPorUsuario(usuario)
+                .actualizadoPorUsuario(usuario)
+                .actualizadoEn(LocalDateTime.now())
                 .build();
 
         Cotizacion guardada = cotizacionRepository.save(copia);
@@ -249,7 +261,7 @@ public class CotizacionService {
     }
 
     @Transactional
-    public PedidoResponse convertirAPedido(Long id, ConvertirPedidoRequest request) {
+    public PedidoResponse convertirAPedido(Long id, ConvertirPedidoRequest request, JwtPrincipal principal) {
         Cotizacion cotizacion = buscarOFallar(id);
         if (!"listo".equals(cotizacion.getEstatus())) {
             throw new EstadoInvalidoException("Solo se puede convertir a pedido una cotizacion en estatus 'listo'");
@@ -260,6 +272,7 @@ public class CotizacionService {
             throw new EstadoInvalidoException("La cotizacion " + id + " no tiene productos registrados, no se puede convertir a pedido");
         }
 
+        String usuario = principal != null ? principal.user() : null;
         Pedido pedido = Pedido.builder()
                 .folio(generarFolioPedido())
                 .cotizacion(cotizacion)
@@ -273,6 +286,9 @@ public class CotizacionService {
                 .fechaProgramada(request.getFechaProgramada())
                 .condicionPago(request.getCondicionPago())
                 .diasCredito(request.getDiasCredito())
+                .creadoPorUsuario(usuario)
+                .actualizadoPorUsuario(usuario)
+                .actualizadoEn(LocalDateTime.now())
                 .build();
 
         Pedido guardado = pedidoRepository.save(pedido);
@@ -475,6 +491,9 @@ public class CotizacionService {
                 .cotizacionOrigenId(cotizacion.getCotizacionOrigen() != null ? cotizacion.getCotizacionOrigen().getId() : null)
                 .observaciones(cotizacion.getObservaciones())
                 .createdAt(cotizacion.getCreatedAt())
+                .creadoPorUsuario(cotizacion.getCreadoPorUsuario())
+                .actualizadoPorUsuario(cotizacion.getActualizadoPorUsuario())
+                .actualizadoEn(cotizacion.getActualizadoEn())
                 .productos(cotizacionDetalleRepository.findByCotizacionId(cotizacion.getId()).stream()
                         .map(this::toItemResponse).toList())
                 .build();
@@ -516,6 +535,9 @@ public class CotizacionService {
                 .estatusGeneral(pedido.getEstatusGeneral())
                 .motivoRechazo(pedido.getMotivoRechazo())
                 .createdAt(pedido.getCreatedAt())
+                .creadoPorUsuario(pedido.getCreadoPorUsuario())
+                .actualizadoPorUsuario(pedido.getActualizadoPorUsuario())
+                .actualizadoEn(pedido.getActualizadoEn())
                 .productos(lineas.stream().map(linea -> PedidoItemResponse.builder()
                         .id(linea.getId())
                         .tipoLinea(linea.getTipoLinea())

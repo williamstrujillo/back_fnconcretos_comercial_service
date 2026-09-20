@@ -18,6 +18,7 @@ import mx.fnconcretos.comercial.exception.ResourceNotFoundException;
 import mx.fnconcretos.comercial.repository.PedidoAutorizacionRepository;
 import mx.fnconcretos.comercial.repository.PedidoDetalleRepository;
 import mx.fnconcretos.comercial.repository.PedidoRepository;
+import mx.fnconcretos.comercial.security.JwtPrincipal;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -70,7 +71,7 @@ public class PedidoService {
     }
 
     @Transactional
-    public PedidoResponse actualizar(Long id, PedidoUpdateRequest request) {
+    public PedidoResponse actualizar(Long id, PedidoUpdateRequest request, JwtPrincipal principal) {
         Pedido pedido = buscarOFallar(id);
         if (!"pendiente_autorizacion_pago".equals(pedido.getEstatusGeneral()) && !"pendiente_autorizacion_logistica".equals(pedido.getEstatusGeneral())) {
             throw new EstadoInvalidoException("Solo se puede editar un pedido mientras esta pendiente de autorizacion");
@@ -83,6 +84,9 @@ public class PedidoService {
         }
         if (request.getCondicionPago() != null) pedido.setCondicionPago(request.getCondicionPago());
         if (request.getDiasCredito() != null) pedido.setDiasCredito(request.getDiasCredito());
+
+        pedido.setActualizadoPorUsuario(principal != null ? principal.user() : null);
+        pedido.setActualizadoEn(LocalDateTime.now());
 
         return toResponse(pedidoRepository.save(pedido));
     }
@@ -232,6 +236,9 @@ public class PedidoService {
                 .estatusGeneral(pedido.getEstatusGeneral())
                 .motivoRechazo(pedido.getMotivoRechazo())
                 .createdAt(pedido.getCreatedAt())
+                .creadoPorUsuario(pedido.getCreadoPorUsuario())
+                .actualizadoPorUsuario(pedido.getActualizadoPorUsuario())
+                .actualizadoEn(pedido.getActualizadoEn())
                 .productos(pedidoDetalleRepository.findByPedidoId(pedido.getId()).stream()
                         .map(this::toItemResponse).toList())
                 .build();

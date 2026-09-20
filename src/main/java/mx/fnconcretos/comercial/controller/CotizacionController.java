@@ -61,22 +61,24 @@ public class CotizacionController {
 
     @PatchMapping("/{id}/estatus")
     @Operation(summary = "Cambiar estatus de la cotizacion (negociacion, listo, cancelada)")
-    public CotizacionResponse cambiarEstatus(@PathVariable Long id, @Valid @RequestBody EstatusRequest request) {
-        return cotizacionService.cambiarEstatus(id, request);
+    public CotizacionResponse cambiarEstatus(@PathVariable Long id, @Valid @RequestBody EstatusRequest request,
+                                              @AuthenticationPrincipal JwtPrincipal principal) {
+        return cotizacionService.cambiarEstatus(id, request, principal);
     }
 
     @PostMapping("/{id}/duplicar")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Duplicar una cotizacion existente para negociar una nueva version (queda enlazada como cotizacionOrigen)")
-    public CotizacionResponse duplicar(@PathVariable Long id) {
-        return cotizacionService.duplicar(id);
+    public CotizacionResponse duplicar(@PathVariable Long id, @AuthenticationPrincipal JwtPrincipal principal) {
+        return cotizacionService.duplicar(id, principal);
     }
 
     @PostMapping("/{id}/convertir-pedido")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Convertir una cotizacion en estatus 'listo' en un pedido formal")
-    public PedidoResponse convertirAPedido(@PathVariable Long id, @Valid @RequestBody ConvertirPedidoRequest request) {
-        return cotizacionService.convertirAPedido(id, request);
+    public PedidoResponse convertirAPedido(@PathVariable Long id, @Valid @RequestBody ConvertirPedidoRequest request,
+                                            @AuthenticationPrincipal JwtPrincipal principal) {
+        return cotizacionService.convertirAPedido(id, request, principal);
     }
 
     @PostMapping("/{id}/enviar-whatsapp")

@@ -105,4 +105,16 @@ public class Pedido {
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    /** Username (JwtPrincipal.user(), ya viene en el JWT -- sin llamada nueva a auth-service) de
+     * quien creo el registro. Null en filas anteriores a este cambio. Inmutable tras crear. */
+    @Column(name = "creado_por_usuario", length = 60)
+    private String creadoPorUsuario;
+
+    /** Se actualiza en cada crear/actualizar/autorizar. */
+    @Column(name = "actualizado_por_usuario", length = 60)
+    private String actualizadoPorUsuario;
+
+    @Column(name = "actualizado_en")
+    private LocalDateTime actualizadoEn;
 }
