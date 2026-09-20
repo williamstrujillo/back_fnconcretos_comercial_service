@@ -42,7 +42,7 @@ public class AutorizacionService {
     }
 
     @Transactional
-    public AutorizacionResponse autorizarPago(Long pedidoId, AutorizarRequest request, Long autorizadoPor, String bearerToken) {
+    public AutorizacionResponse autorizarPago(Long pedidoId, AutorizarRequest request, Long autorizadoPor, String actualizadoPorUsuario, String bearerToken) {
         Pedido pedido = pedidoService.buscarOFallar(pedidoId);
         if (!"pendiente_autorizacion_pago".equals(pedido.getEstatusGeneral())) {
             throw new EstadoInvalidoException("El pedido " + pedidoId + " no esta pendiente de autorizacion de pago (estatus actual: "
@@ -50,6 +50,8 @@ public class AutorizacionService {
         }
 
         PedidoAutorizacion autorizacion = registrarAutorizacion(pedido, "pago", request, autorizadoPor);
+        pedido.setActualizadoPorUsuario(actualizadoPorUsuario);
+        pedido.setActualizadoEn(LocalDateTime.now());
 
         if (APROBADO.equals(request.getResultado())) {
             pedido.setEstatusPagoAutorizacion(APROBADO);
@@ -69,7 +71,7 @@ public class AutorizacionService {
     }
 
     @Transactional
-    public AutorizacionResponse autorizarLogistica(Long pedidoId, AutorizarRequest request, Long autorizadoPor, String bearerToken) {
+    public AutorizacionResponse autorizarLogistica(Long pedidoId, AutorizarRequest request, Long autorizadoPor, String actualizadoPorUsuario, String bearerToken) {
         Pedido pedido = pedidoService.buscarOFallar(pedidoId);
         if (!"pendiente_autorizacion_logistica".equals(pedido.getEstatusGeneral())) {
             throw new EstadoInvalidoException("El pedido " + pedidoId + " no esta pendiente de autorizacion de logistica (estatus actual: "
@@ -77,6 +79,8 @@ public class AutorizacionService {
         }
 
         PedidoAutorizacion autorizacion = registrarAutorizacion(pedido, "logistica", request, autorizadoPor);
+        pedido.setActualizadoPorUsuario(actualizadoPorUsuario);
+        pedido.setActualizadoEn(LocalDateTime.now());
 
         if (APROBADO.equals(request.getResultado())) {
             pedido.setEstatusLogisticaAutorizacion(APROBADO);

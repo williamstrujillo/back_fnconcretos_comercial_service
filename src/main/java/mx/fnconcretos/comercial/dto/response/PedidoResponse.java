@@ -41,4 +41,7 @@ public class PedidoResponse {
     private String estatusGeneral;
     private String motivoRechazo;
     private LocalDateTime createdAt;
+    private String creadoPorUsuario;
+    private String actualizadoPorUsuario;
+    private LocalDateTime actualizadoEn;
 }

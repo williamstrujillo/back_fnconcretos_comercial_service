@@ -9,8 +9,10 @@ import mx.fnconcretos.comercial.dto.request.PedidoUpdateRequest;
 import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
 import mx.fnconcretos.comercial.dto.response.AvancePedidoResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
+import mx.fnconcretos.comercial.security.JwtPrincipal;
 import mx.fnconcretos.comercial.service.PedidoService;
 import org.springframework.http.HttpHeaders;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -40,8 +42,9 @@ public class PedidoController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar un pedido (solo mientras esta pendiente de autorizacion)")
-    public PedidoResponse actualizar(@PathVariable Long id, @Valid @RequestBody PedidoUpdateRequest request) {
-        return pedidoService.actualizar(id, request);
+    public PedidoResponse actualizar(@PathVariable Long id, @Valid @RequestBody PedidoUpdateRequest request,
+                                      @AuthenticationPrincipal JwtPrincipal principal) {
+        return pedidoService.actualizar(id, request, principal);
     }
 
     @GetMapping("/{id}/avance")

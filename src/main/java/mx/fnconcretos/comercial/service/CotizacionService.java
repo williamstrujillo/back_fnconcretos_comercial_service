@@ -261,7 +261,7 @@ public class CotizacionService {
     }
 
     @Transactional
-    public PedidoResponse convertirAPedido(Long id, ConvertirPedidoRequest request) {
+    public PedidoResponse convertirAPedido(Long id, ConvertirPedidoRequest request, JwtPrincipal principal) {
         Cotizacion cotizacion = buscarOFallar(id);
         if (!"listo".equals(cotizacion.getEstatus())) {
             throw new EstadoInvalidoException("Solo se puede convertir a pedido una cotizacion en estatus 'listo'");
@@ -272,6 +272,7 @@ public class CotizacionService {
             throw new EstadoInvalidoException("La cotizacion " + id + " no tiene productos registrados, no se puede convertir a pedido");
         }
 
+        String usuario = principal != null ? principal.user() : null;
         Pedido pedido = Pedido.builder()
                 .folio(generarFolioPedido())
                 .cotizacion(cotizacion)
@@ -285,6 +286,9 @@ public class CotizacionService {
                 .fechaProgramada(request.getFechaProgramada())
                 .condicionPago(request.getCondicionPago())
                 .diasCredito(request.getDiasCredito())
+                .creadoPorUsuario(usuario)
+                .actualizadoPorUsuario(usuario)
+                .actualizadoEn(LocalDateTime.now())
                 .build();
 
         Pedido guardado = pedidoRepository.save(pedido);
@@ -531,6 +535,9 @@ public class CotizacionService {
                 .estatusGeneral(pedido.getEstatusGeneral())
                 .motivoRechazo(pedido.getMotivoRechazo())
                 .createdAt(pedido.getCreatedAt())
+                .creadoPorUsuario(pedido.getCreadoPorUsuario())
+                .actualizadoPorUsuario(pedido.getActualizadoPorUsuario())
+                .actualizadoEn(pedido.getActualizadoEn())
                 .productos(lineas.stream().map(linea -> PedidoItemResponse.builder()
                         .id(linea.getId())
                         .tipoLinea(linea.getTipoLinea())

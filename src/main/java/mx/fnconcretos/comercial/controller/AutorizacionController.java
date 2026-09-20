@@ -37,7 +37,7 @@ public class AutorizacionController {
     public AutorizacionResponse autorizarPago(@PathVariable Long pedidoId, @Valid @RequestBody AutorizarRequest request,
                                                @AuthenticationPrincipal JwtPrincipal principal,
                                                @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
-        return autorizacionService.autorizarPago(pedidoId, request, principal.usuarioId(), authorization);
+        return autorizacionService.autorizarPago(pedidoId, request, principal.usuarioId(), principal.user(), authorization);
     }
 
     @PostMapping("/logistica")
@@ -46,6 +46,6 @@ public class AutorizacionController {
     public AutorizacionResponse autorizarLogistica(@PathVariable Long pedidoId, @Valid @RequestBody AutorizarRequest request,
                                                     @AuthenticationPrincipal JwtPrincipal principal,
                                                     @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
-        return autorizacionService.autorizarLogistica(pedidoId, request, principal.usuarioId(), authorization);
+        return autorizacionService.autorizarLogistica(pedidoId, request, principal.usuarioId(), principal.user(), authorization);
     }
 }
