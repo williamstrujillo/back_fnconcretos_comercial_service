@@ -156,10 +156,19 @@ public class CotizacionCompartidaService {
                 .elemento(null)
                 .notas(null)
                 .fechaHoraServicio(fechaHoraServicio)
-                .condicionPago("factura".equals(cotizacion.getFormaPago()) ? "Factura" : "Efectivo")
+                .condicionPago(etiquetaFormaPago(cotizacion.getFormaPago()))
                 .bomba("bomba".equals(cotizacion.getTipoServicio()) ? "Sí" : null)
                 .autorizo(null)
                 .build();
+    }
+
+    private String etiquetaFormaPago(String formaPago) {
+        return switch (formaPago) {
+            case "transferencia" -> "Transferencia";
+            case "tarjeta_debito" -> "Tarjeta de débito";
+            case "tarjeta_credito" -> "Tarjeta de crédito";
+            default -> "Efectivo";
+        };
     }
 
     private List<CotizacionPublicaResponse.LineaInfo> construirLineas(List<CotizacionDetalle> lineas, String bearerToken) {

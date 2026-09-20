@@ -88,7 +88,7 @@ public class CotizacionService {
         AsesorComercial asesor = request.getAsesorId() != null ? asesorService.buscarOFallar(request.getAsesorId()) : null;
 
         BigDecimal descuento = request.getPorcentajeDescuento() != null ? request.getPorcentajeDescuento() : BigDecimal.ZERO;
-        validarDescuento(descuento, request.getFormaPago(), principal);
+        validarDescuento(descuento, request.getRequiereFactura(), principal);
 
         CatalogoClient.PlantaTarifas tarifas = catalogoClient.obtenerTarifas(request.getPlantaId(), bearerToken);
         List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento);
@@ -165,7 +165,7 @@ public class CotizacionService {
         }
 
         BigDecimal descuento = request.getPorcentajeDescuento() != null ? request.getPorcentajeDescuento() : BigDecimal.ZERO;
-        validarDescuento(descuento, request.getFormaPago(), principal);
+        validarDescuento(descuento, request.getRequiereFactura(), principal);
 
         CatalogoClient.PlantaTarifas tarifas = catalogoClient.obtenerTarifas(request.getPlantaId(), bearerToken);
         List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento);
@@ -407,13 +407,14 @@ public class CotizacionService {
                 .orElse(BigDecimal.ZERO);
     }
 
-    private void validarDescuento(BigDecimal descuento, String formaPago, JwtPrincipal principal) {
+    private void validarDescuento(BigDecimal descuento, Boolean requiereFactura, JwtPrincipal principal) {
         if (descuento == null || descuento.signum() <= 0) return;
 
-        BigDecimal limite = "factura".equals(formaPago) ? descuentoMaxFactura : descuentoMaxEfectivo;
+        boolean factura = Boolean.TRUE.equals(requiereFactura);
+        BigDecimal limite = factura ? descuentoMaxFactura : descuentoMaxEfectivo;
         if (descuento.compareTo(limite) > 0 && (principal == null || !principal.tienePermiso("cotizaciones.aplicar_descuento_especial"))) {
             throw new AccessDeniedException("El descuento de " + descuento + "% excede el limite de " + limite
-                    + "% para forma de pago '" + formaPago + "'; se requiere el permiso cotizaciones.aplicar_descuento_especial");
+                    + "% para cotizaciones " + (factura ? "con" : "sin") + " factura; se requiere el permiso cotizaciones.aplicar_descuento_especial");
         }
     }
 

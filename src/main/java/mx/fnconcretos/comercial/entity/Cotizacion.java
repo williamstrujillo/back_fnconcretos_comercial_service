@@ -65,7 +65,9 @@ public class Cotizacion {
     @Column(name = "fecha_suministro_estimada")
     private LocalDate fechaSuministroEstimada;
 
-    /** efectivo, factura */
+    /** Metodo de pago real: efectivo, transferencia, tarjeta_debito, tarjeta_credito (mismo catalogo
+     * que Pago.metodoPago en finanzas-service). El tope de descuento ya NO depende de este campo --
+     * ver requiereFactura y CotizacionService.validarDescuento. */
     @Column(name = "forma_pago", nullable = false, length = 20)
     @Builder.Default
     private String formaPago = "efectivo";

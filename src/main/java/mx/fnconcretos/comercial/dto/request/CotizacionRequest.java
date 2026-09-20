@@ -40,9 +40,11 @@ public class CotizacionRequest {
 
     private LocalDate fechaSuministroEstimada;
 
-    /** efectivo, factura */
+    /** Metodo de pago real: efectivo, transferencia, tarjeta_debito, tarjeta_credito. */
     private String formaPago;
 
+    /** Determina el tope de descuento permitido (ver CotizacionService.validarDescuento), no solo
+     * si se emitira CFDI. */
     private Boolean requiereFactura;
 
     @DecimalMin(value = "0.0", message = "El descuento no puede ser negativo")
