@@ -42,4 +42,7 @@ public class CotizacionResponse {
     private Long cotizacionOrigenId;
     private String observaciones;
     private LocalDateTime createdAt;
+    private String creadoPorUsuario;
+    private String actualizadoPorUsuario;
+    private LocalDateTime actualizadoEn;
 }
