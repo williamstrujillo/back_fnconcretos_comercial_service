@@ -48,11 +48,14 @@ public class PedidoService {
     private final AuthClient authClient;
 
     @Transactional(readOnly = true)
-    public List<PedidoResponse> listar(Long clienteId, String estatusGeneral, String q) {
+    public List<PedidoResponse> listar(Long clienteId, String estatusGeneral, String q, Long plantaId) {
         Specification<Pedido> spec = Specification.where(null);
 
         if (clienteId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("cliente").get("id"), clienteId));
+        }
+        if (plantaId != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("plantaId"), plantaId));
         }
         if (estatusGeneral != null && !estatusGeneral.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("estatusGeneral"), estatusGeneral));
