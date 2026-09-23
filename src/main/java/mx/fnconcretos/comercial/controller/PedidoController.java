@@ -8,8 +8,10 @@ import lombok.RequiredArgsConstructor;
 import mx.fnconcretos.comercial.dto.request.PedidoUpdateRequest;
 import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
 import mx.fnconcretos.comercial.dto.response.AvancePedidoResponse;
+import mx.fnconcretos.comercial.dto.response.BitacoraEventoResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
 import mx.fnconcretos.comercial.security.JwtPrincipal;
+import mx.fnconcretos.comercial.service.BitacoraService;
 import mx.fnconcretos.comercial.service.PedidoService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -25,6 +27,7 @@ import java.util.List;
 public class PedidoController {
 
     private final PedidoService pedidoService;
+    private final BitacoraService bitacoraService;
 
     @GetMapping
     @Operation(summary = "Buscar pedidos por cliente, planta, estatus general o folio (q, coincidencia parcial)")
@@ -60,5 +63,11 @@ public class PedidoController {
     public PedidoResponse registrarEntrega(@PathVariable Long id, @Valid @RequestBody RegistrarEntregaRequest request,
                                             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
         return pedidoService.registrarEntrega(id, request, authorization);
+    }
+
+    @GetMapping("/{id}/bitacora")
+    @Operation(summary = "Historial completo de acciones sobre el pedido (quien y cuando), en orden mas reciente primero")
+    public List<BitacoraEventoResponse> bitacora(@PathVariable Long id) {
+        return bitacoraService.listar("pedido", id);
     }
 }

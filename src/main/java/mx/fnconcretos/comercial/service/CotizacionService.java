@@ -56,6 +56,7 @@ public class CotizacionService {
     private final CatalogoClient catalogoClient;
     private final WhatsAppClient whatsAppClient;
     private final CotizacionCompartidaService cotizacionCompartidaService;
+    private final BitacoraService bitacoraService;
 
     @Value("${negocio.descuento.max-efectivo}")
     private BigDecimal descuentoMaxEfectivo;
@@ -121,6 +122,9 @@ public class CotizacionService {
         Cotizacion guardada = cotizacionRepository.save(cotizacion);
         lineas.forEach(linea -> linea.setCotizacion(guardada));
         cotizacionDetalleRepository.saveAll(lineas);
+
+        bitacoraService.registrar("cotizacion", guardada.getId(), "creacion",
+                "Creo la cotizacion " + guardada.getFolio(), guardada.getCreadoPorUsuario());
 
         return toResponse(guardada);
     }
@@ -199,6 +203,9 @@ public class CotizacionService {
         lineas.forEach(linea -> linea.setCotizacion(guardada));
         cotizacionDetalleRepository.saveAll(lineas);
 
+        bitacoraService.registrar("cotizacion", guardada.getId(), "actualizacion",
+                "Actualizo los datos de la cotizacion", guardada.getActualizadoPorUsuario());
+
         return toResponse(guardada);
     }
 
@@ -208,10 +215,17 @@ public class CotizacionService {
         if ("convertida".equals(cotizacion.getEstatus())) {
             throw new EstadoInvalidoException("No se puede cambiar el estatus de una cotizacion ya convertida a pedido");
         }
+        String estatusAnterior = cotizacion.getEstatus();
+        String usuario = principal != null ? principal.user() : null;
         cotizacion.setEstatus(request.getEstatus());
-        cotizacion.setActualizadoPorUsuario(principal != null ? principal.user() : null);
+        cotizacion.setActualizadoPorUsuario(usuario);
         cotizacion.setActualizadoEn(LocalDateTime.now());
-        return toResponse(cotizacionRepository.save(cotizacion));
+        Cotizacion guardada = cotizacionRepository.save(cotizacion);
+
+        bitacoraService.registrar("cotizacion", guardada.getId(), "cambio_estatus",
+                "Cambio el estatus de " + estatusAnterior + " a " + request.getEstatus(), usuario);
+
+        return toResponse(guardada);
     }
 
     @Transactional
@@ -256,6 +270,9 @@ public class CotizacionService {
                         .build())
                 .toList();
         cotizacionDetalleRepository.saveAll(copiaLineas);
+
+        bitacoraService.registrar("cotizacion", guardada.getId(), "creacion",
+                "Duplico la cotizacion " + origen.getFolio(), usuario);
 
         return toResponse(guardada);
     }
@@ -309,6 +326,11 @@ public class CotizacionService {
 
         cotizacion.setEstatus("convertida");
         cotizacionRepository.save(cotizacion);
+
+        bitacoraService.registrar("cotizacion", cotizacion.getId(), "conversion",
+                "Convirtio la cotizacion en el pedido " + guardado.getFolio(), usuario);
+        bitacoraService.registrar("pedido", guardado.getId(), "creacion",
+                "Creado a partir de la cotizacion " + cotizacion.getFolio(), usuario);
 
         return toPedidoResponse(guardado, lineasPedido);
     }

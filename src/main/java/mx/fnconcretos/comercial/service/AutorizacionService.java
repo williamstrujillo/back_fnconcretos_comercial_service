@@ -35,6 +35,7 @@ public class AutorizacionService {
     private final NotificacionClient notificacionClient;
     private final WhatsAppClient whatsAppClient;
     private final OperacionesClient operacionesClient;
+    private final BitacoraService bitacoraService;
 
     @Transactional(readOnly = true)
     public List<AutorizacionResponse> listarPorPedido(Long pedidoId) {
@@ -58,6 +59,7 @@ public class AutorizacionService {
             pedido.setEstatusGeneral("pendiente_autorizacion_logistica");
             notificarAsesor(pedido, "Pago autorizado",
                     "El pago del pedido " + pedido.getFolio() + " fue autorizado, esta pendiente de autorizacion de logistica.", bearerToken);
+            bitacoraService.registrar("pedido", pedido.getId(), "autorizacion_pago", "Autorizo el pago", actualizadoPorUsuario);
         } else {
             pedido.setEstatusPagoAutorizacion(RECHAZADO);
             pedido.setEstatusGeneral("rechazado");
@@ -65,6 +67,8 @@ public class AutorizacionService {
             notificarAsesor(pedido, "Pago rechazado",
                     "El pago del pedido " + pedido.getFolio() + " fue rechazado"
                             + (request.getMotivo() != null ? ": " + request.getMotivo() : "."), bearerToken);
+            bitacoraService.registrar("pedido", pedido.getId(), "autorizacion_pago",
+                    "Rechazo el pago" + (request.getMotivo() != null ? ": " + request.getMotivo() : ""), actualizadoPorUsuario);
         }
 
         return toResponse(autorizacion);
@@ -88,6 +92,7 @@ public class AutorizacionService {
             notificarAsesor(pedido, "Pedido autorizado",
                     "El pedido " + pedido.getFolio() + " ya quedo autorizado y listo para programar entrega.", bearerToken);
             notificarClienteConfirmacion(pedido, bearerToken);
+            bitacoraService.registrar("pedido", pedido.getId(), "autorizacion_logistica", "Autorizo la logistica", actualizadoPorUsuario);
         } else {
             pedido.setEstatusLogisticaAutorizacion(RECHAZADO);
             pedido.setEstatusGeneral("rechazado");
@@ -95,6 +100,8 @@ public class AutorizacionService {
             notificarAsesor(pedido, "Logistica rechazada",
                     "La logistica del pedido " + pedido.getFolio() + " fue rechazada"
                             + (request.getMotivo() != null ? ": " + request.getMotivo() : "."), bearerToken);
+            bitacoraService.registrar("pedido", pedido.getId(), "autorizacion_logistica",
+                    "Rechazo la logistica" + (request.getMotivo() != null ? ": " + request.getMotivo() : ""), actualizadoPorUsuario);
         }
 
         return toResponse(autorizacion);

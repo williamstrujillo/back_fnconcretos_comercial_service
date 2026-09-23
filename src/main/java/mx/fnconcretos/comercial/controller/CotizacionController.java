@@ -8,10 +8,12 @@ import lombok.RequiredArgsConstructor;
 import mx.fnconcretos.comercial.dto.request.ConvertirPedidoRequest;
 import mx.fnconcretos.comercial.dto.request.CotizacionRequest;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
+import mx.fnconcretos.comercial.dto.response.BitacoraEventoResponse;
 import mx.fnconcretos.comercial.dto.response.CotizacionResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
 import mx.fnconcretos.comercial.dto.response.WhatsAppEnvioResponse;
 import mx.fnconcretos.comercial.security.JwtPrincipal;
+import mx.fnconcretos.comercial.service.BitacoraService;
 import mx.fnconcretos.comercial.service.CotizacionService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -28,6 +30,7 @@ import java.util.List;
 public class CotizacionController {
 
     private final CotizacionService cotizacionService;
+    private final BitacoraService bitacoraService;
 
     @GetMapping
     @Operation(summary = "Buscar cotizaciones por cliente, estatus o folio (q, coincidencia parcial)")
@@ -85,5 +88,11 @@ public class CotizacionController {
     @Operation(summary = "Notificar al cliente por WhatsApp que su cotizacion esta lista (plantilla aprobada 'cotizacion_lista'), con boton al link publico de la cotizacion")
     public WhatsAppEnvioResponse enviarWhatsApp(@PathVariable Long id, @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
         return cotizacionService.enviarWhatsApp(id, authorization);
+    }
+
+    @GetMapping("/{id}/bitacora")
+    @Operation(summary = "Historial completo de acciones sobre la cotizacion (quien y cuando), en orden mas reciente primero")
+    public List<BitacoraEventoResponse> bitacora(@PathVariable Long id) {
+        return bitacoraService.listar("cotizacion", id);
     }
 }

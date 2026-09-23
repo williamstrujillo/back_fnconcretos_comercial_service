@@ -46,6 +46,7 @@ public class PedidoService {
     private final PedidoAutorizacionRepository autorizacionRepository;
     private final NotificacionClient notificacionClient;
     private final AuthClient authClient;
+    private final BitacoraService bitacoraService;
 
     @Transactional(readOnly = true)
     public List<PedidoResponse> listar(Long clienteId, String estatusGeneral, String q, Long plantaId) {
@@ -88,10 +89,15 @@ public class PedidoService {
         if (request.getCondicionPago() != null) pedido.setCondicionPago(request.getCondicionPago());
         if (request.getDiasCredito() != null) pedido.setDiasCredito(request.getDiasCredito());
 
-        pedido.setActualizadoPorUsuario(principal != null ? principal.user() : null);
+        String usuario = principal != null ? principal.user() : null;
+        pedido.setActualizadoPorUsuario(usuario);
         pedido.setActualizadoEn(LocalDateTime.now());
 
-        return toResponse(pedidoRepository.save(pedido));
+        Pedido guardado = pedidoRepository.save(pedido);
+        bitacoraService.registrar("pedido", guardado.getId(), "actualizacion",
+                "Actualizo los datos del pedido", usuario);
+
+        return toResponse(guardado);
     }
 
     /**
@@ -135,6 +141,11 @@ public class PedidoService {
         if ("completo".equals(guardado.getEstatusGeneral())) {
             notificarAsesor(guardado, bearerToken);
         }
+
+        String descripcionEntrega = "Se registro una entrega de " + request.getMetrosEntregados() + " m3"
+                + (request.getRemisionId() != null ? " (remision " + request.getRemisionId() + ")" : "");
+        bitacoraService.registrar("pedido", guardado.getId(), "entrega", descripcionEntrega, null);
+
         return toResponse(guardado);
     }
 
