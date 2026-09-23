@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -43,6 +44,12 @@ public class CotizacionRequest {
     private String tipoServicio;
 
     private LocalDate fechaSuministroEstimada;
+
+    /** Hora solicitada por el cliente para la entrega. */
+    private LocalTime horarioEntrega;
+
+    /** Elemento constructivo (losa, piso, muro, etc.) en catalogo-service. Opcional. */
+    private Long elementoConstructivoId;
 
     /** Metodo de pago real: efectivo, transferencia, tarjeta_debito, tarjeta_credito. */
     private String formaPago;

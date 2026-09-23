@@ -18,5 +18,6 @@ public class CotizacionItemResponse {
     private BigDecimal volumenM3;
     private BigDecimal precioUnitario;
     private BigDecimal precioTotal;
+    private BigDecimal porcentajeDescuentoLinea;
     private String descripcion;
 }

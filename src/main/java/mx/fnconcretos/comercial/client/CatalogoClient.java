@@ -53,8 +53,24 @@ public class CatalogoClient {
                 .body(ProductoInfo.class);
     }
 
+    /** Nombre del elemento constructivo (losa, piso, muro, etc.), para resolver el snapshot publico
+     * de cotizacion. bearerToken debe incluir el prefijo "Bearer ". */
+    public ElementoConstructivoInfo obtenerElementoConstructivo(Long elementoConstructivoId, String bearerToken) {
+        return restClient.get()
+                .uri("/elementos-constructivos/{id}", elementoConstructivoId)
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .body(ElementoConstructivoInfo.class);
+    }
+
     @Data
     public static class ProductoInfo {
+        private Long id;
+        private String nombre;
+    }
+
+    @Data
+    public static class ElementoConstructivoInfo {
         private Long id;
         private String nombre;
     }
@@ -68,6 +84,8 @@ public class CatalogoClient {
         private BigDecimal precioPorM3Vacio;
         private BigDecimal precioPorM3Bombeo;
         private BigDecimal porcentajeIva;
+        private BigDecimal latitud;
+        private BigDecimal longitud;
     }
 
     @Data

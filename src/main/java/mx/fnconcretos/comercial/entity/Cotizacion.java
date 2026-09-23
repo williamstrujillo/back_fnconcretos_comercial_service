@@ -17,6 +17,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "cotizaciones")
@@ -64,6 +65,22 @@ public class Cotizacion {
 
     @Column(name = "fecha_suministro_estimada")
     private LocalDate fechaSuministroEstimada;
+
+    /** Hora solicitada por el cliente para la entrega -- se propaga al Pedido al convertir (ver
+     * CotizacionService.convertirAPedido) y es la base de la deteccion de "pedidos cruzados" en
+     * programacion de pedidos. */
+    @Column(name = "horario_entrega")
+    private LocalTime horarioEntrega;
+
+    /** Elemento constructivo (losa, piso, muro, etc.) en catalogo-service; solo el id. */
+    @Column(name = "elemento_constructivo_id")
+    private Long elementoConstructivoId;
+
+    /** Distancia real por carretera obra<->planta en KM, calculada automatico via Google Maps
+     * Distance Matrix (CotizacionService/GoogleMapsClient) cuando ambas ubicaciones se conocen.
+     * Null si falta alguna coordenada o si la llamada a la API fallo -- nunca bloquea el guardado. */
+    @Column(name = "distancia_km", precision = 8, scale = 2)
+    private BigDecimal distanciaKm;
 
     /** Metodo de pago real: efectivo, transferencia, tarjeta_debito, tarjeta_credito (mismo catalogo
      * que Pago.metodoPago en finanzas-service). El tope de descuento ya NO depende de este campo --

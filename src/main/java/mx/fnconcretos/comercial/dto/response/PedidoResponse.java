@@ -34,8 +34,20 @@ public class PedidoResponse {
     private List<PedidoItemResponse> productos;
     private String tipoServicio;
     private LocalDate fechaProgramada;
+    /** Hora solicitada por el cliente (copiada de la cotizacion de origen al convertir) -- usada
+     * por programacion de pedidos para detectar "pedidos cruzados". */
+    private java.time.LocalTime horarioEntrega;
+    /** Elemento constructivo (losa, piso, muro, etc.) en catalogo-service; solo el id. */
+    private Long elementoConstructivoId;
+    /** Distancia real por carretera obra<->planta en KM (copiada de la cotizacion de origen). */
+    private BigDecimal distanciaKm;
     private String condicionPago;
     private Integer diasCredito;
+    /** Metodo con el que el cliente va a pagar (efectivo, transferencia, tarjeta_debito,
+     * tarjeta_credito) -- tomado de la cotizacion de origen, no un campo propio del pedido. */
+    private String formaPago;
+    /** Suma de precioTotal de todas las lineas (producto + bombeo + flete_vacio + iva). */
+    private java.math.BigDecimal montoTotal;
     private String estatusPagoAutorizacion;
     private String estatusLogisticaAutorizacion;
     private String estatusGeneral;

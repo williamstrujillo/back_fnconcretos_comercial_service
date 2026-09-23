@@ -67,6 +67,7 @@ public class CotizacionPublicaResponse {
         private String condicionPago;
         private String bomba;
         private String autorizo;
+        private String distanciaKm;
     }
 
     @Data

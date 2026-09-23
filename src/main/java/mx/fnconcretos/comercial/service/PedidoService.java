@@ -227,6 +227,12 @@ public class PedidoService {
     }
 
     PedidoResponse toResponse(Pedido pedido) {
+        List<PedidoDetalle> lineas = pedidoDetalleRepository.findByPedidoId(pedido.getId());
+        BigDecimal montoTotal = lineas.stream()
+                .map(PedidoDetalle::getPrecioTotal)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         return PedidoResponse.builder()
                 .id(pedido.getId())
                 .folio(pedido.getFolio())
@@ -243,8 +249,13 @@ public class PedidoService {
                 .volumenPendienteM3(pedido.getVolumenPendienteM3())
                 .tipoServicio(pedido.getTipoServicio())
                 .fechaProgramada(pedido.getFechaProgramada())
+                .horarioEntrega(pedido.getHorarioEntrega())
+                .elementoConstructivoId(pedido.getElementoConstructivoId())
+                .distanciaKm(pedido.getDistanciaKm())
                 .condicionPago(pedido.getCondicionPago())
                 .diasCredito(pedido.getDiasCredito())
+                .formaPago(pedido.getCotizacion() != null ? pedido.getCotizacion().getFormaPago() : null)
+                .montoTotal(montoTotal)
                 .estatusPagoAutorizacion(pedido.getEstatusPagoAutorizacion())
                 .estatusLogisticaAutorizacion(pedido.getEstatusLogisticaAutorizacion())
                 .estatusGeneral(pedido.getEstatusGeneral())
@@ -253,8 +264,7 @@ public class PedidoService {
                 .creadoPorUsuario(pedido.getCreadoPorUsuario())
                 .actualizadoPorUsuario(pedido.getActualizadoPorUsuario())
                 .actualizadoEn(pedido.getActualizadoEn())
-                .productos(pedidoDetalleRepository.findByPedidoId(pedido.getId()).stream()
-                        .map(this::toItemResponse).toList())
+                .productos(lineas.stream().map(this::toItemResponse).toList())
                 .build();
     }
 
