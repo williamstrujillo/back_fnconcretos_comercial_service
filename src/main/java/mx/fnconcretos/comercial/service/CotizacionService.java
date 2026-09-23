@@ -93,7 +93,7 @@ public class CotizacionService {
         validarDescuento(descuento, request.getRequiereFactura(), principal);
 
         CatalogoClient.PlantaTarifas tarifas = catalogoClient.obtenerTarifas(request.getPlantaId(), bearerToken);
-        List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento);
+        List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento, principal);
         BigDecimal volumenTotal = volumenTotalProducto(lineas);
         BigDecimal precioTotal = precioTotalLineas(lineas);
         BigDecimal precioUnitarioPrimero = precioUnitarioPrimerProducto(lineas);
@@ -176,7 +176,7 @@ public class CotizacionService {
         validarDescuento(descuento, request.getRequiereFactura(), principal);
 
         CatalogoClient.PlantaTarifas tarifas = catalogoClient.obtenerTarifas(request.getPlantaId(), bearerToken);
-        List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento);
+        List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento, principal);
         BigDecimal volumenTotal = volumenTotalProducto(lineas);
         BigDecimal precioTotal = precioTotalLineas(lineas);
         BigDecimal precioUnitarioPrimero = precioUnitarioPrimerProducto(lineas);
@@ -335,6 +335,11 @@ public class CotizacionService {
         return toPedidoResponse(guardado, lineasPedido);
     }
 
+    /** Rol que no puede modificar el costo (precioUnitario) del flete por vacio -- puede editar el
+     * volumen, pero el precio siempre se fuerza a la tarifa de la planta (se ignora en silencio lo
+     * que mande, mismo criterio que Cliente.origenCaptacion="asignado" fuerza 1% de comision). */
+    private static final String ROL_ASESOR_COMERCIAL = "Asesor Comercial";
+
     /**
      * Expande "productos" a las lineas reales a guardar: cada linea 'producto' genera
      * ademas, si aplica, su linea automatica de 'flete_vacio' (capacidadReferenciaM3/
@@ -342,7 +347,7 @@ public class CotizacionService {
      * toman el volumen total de las lineas 'producto'. El descuento solo aplica a
      * lineas 'producto' (bombeo/flete_vacio son cargos logisticos, no negociables).
      */
-    private List<CotizacionDetalle> calcularLineas(List<CotizacionItemRequest> items, CatalogoClient.PlantaTarifas tarifas, BigDecimal descuento) {
+    private List<CotizacionDetalle> calcularLineas(List<CotizacionItemRequest> items, CatalogoClient.PlantaTarifas tarifas, BigDecimal descuento, JwtPrincipal principal) {
         BigDecimal volumenTotalProducto = items.stream()
                 .filter(this::esProducto)
                 .map(item -> {
@@ -405,10 +410,14 @@ public class CotizacionService {
             } else if ("flete_vacio".equals(tipo)) {
                 // El asesor edito (o creo a mano) esta linea -- se respeta el volumen/precio que
                 // mande, completando con el default de la planta solo lo que falte (mismo
-                // criterio que bombeo).
+                // criterio que bombeo). Excepcion: Asesor Comercial no puede tocar el costo, el
+                // precio siempre es la tarifa de la planta sin importar lo que haya mandado.
                 BigDecimal precioVacioDefault = tarifas.getPrecioPorM3Vacio() != null ? tarifas.getPrecioPorM3Vacio() : BigDecimal.ZERO;
                 BigDecimal volumen = item.getVolumenM3() != null ? item.getVolumenM3() : BigDecimal.ZERO;
-                BigDecimal precioUnitario = item.getPrecioUnitario() != null ? item.getPrecioUnitario() : precioVacioDefault;
+                boolean esAsesorComercial = principal != null && ROL_ASESOR_COMERCIAL.equals(principal.rol());
+                BigDecimal precioUnitario = !esAsesorComercial && item.getPrecioUnitario() != null
+                        ? item.getPrecioUnitario()
+                        : precioVacioDefault;
                 lineas.add(CotizacionDetalle.builder()
                         .tipoLinea("flete_vacio")
                         .volumenM3(volumen)
