@@ -2,6 +2,7 @@ package mx.fnconcretos.comercial.service;
 
 import lombok.RequiredArgsConstructor;
 import mx.fnconcretos.comercial.client.CatalogoClient;
+import mx.fnconcretos.comercial.client.GoogleMapsClient;
 import mx.fnconcretos.comercial.client.WhatsAppClient;
 import mx.fnconcretos.comercial.dto.request.CotizacionItemRequest;
 import mx.fnconcretos.comercial.dto.request.CotizacionRequest;
@@ -54,6 +55,7 @@ public class CotizacionService {
     private final ContactoClienteRepository contactoClienteRepository;
     private final AsesorComercialService asesorService;
     private final CatalogoClient catalogoClient;
+    private final GoogleMapsClient googleMapsClient;
     private final WhatsAppClient whatsAppClient;
     private final CotizacionCompartidaService cotizacionCompartidaService;
     private final BitacoraService bitacoraService;
@@ -97,6 +99,7 @@ public class CotizacionService {
 
         BigDecimal descuento = request.getPorcentajeDescuento() != null ? request.getPorcentajeDescuento() : BigDecimal.ZERO;
         validarDescuento(descuento, request.getRequiereFactura(), principal);
+        validarDescuentosLinea(request.getProductos(), principal);
 
         CatalogoClient.PlantaTarifas tarifas = catalogoClient.obtenerTarifas(request.getPlantaId(), bearerToken);
         List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento, principal);
@@ -106,6 +109,7 @@ public class CotizacionService {
         boolean requiereFactura = Boolean.TRUE.equals(request.getRequiereFactura());
         BigDecimal porcentajeIvaAplicado = requiereFactura ? porcentajeIvaDePlanta(tarifas) : null;
         BigDecimal iva = calcularIva(subtotal, porcentajeIvaAplicado);
+        BigDecimal distanciaKm = calcularDistanciaKm(obra, tarifas);
 
         Cotizacion cotizacion = Cotizacion.builder()
                 .folio(generarFolio())
@@ -117,6 +121,9 @@ public class CotizacionService {
                 .volumenM3(volumenTotal)
                 .tipoServicio(request.getTipoServicio() != null ? request.getTipoServicio() : "directo")
                 .fechaSuministroEstimada(request.getFechaSuministroEstimada())
+                .horarioEntrega(request.getHorarioEntrega())
+                .elementoConstructivoId(request.getElementoConstructivoId())
+                .distanciaKm(distanciaKm)
                 .formaPago(request.getFormaPago() != null ? request.getFormaPago() : "efectivo")
                 .requiereFactura(requiereFactura)
                 .porcentajeDescuento(descuento)
@@ -186,6 +193,7 @@ public class CotizacionService {
 
         BigDecimal descuento = request.getPorcentajeDescuento() != null ? request.getPorcentajeDescuento() : BigDecimal.ZERO;
         validarDescuento(descuento, request.getRequiereFactura(), principal);
+        validarDescuentosLinea(request.getProductos(), principal);
 
         CatalogoClient.PlantaTarifas tarifas = catalogoClient.obtenerTarifas(request.getPlantaId(), bearerToken);
         List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento, principal);
@@ -196,14 +204,26 @@ public class CotizacionService {
         BigDecimal porcentajeIvaAplicado = requiereFactura ? porcentajeIvaDePlanta(tarifas) : null;
         BigDecimal iva = calcularIva(subtotal, porcentajeIvaAplicado);
 
+        // Solo se vuelve a llamar a Google Maps si cambio la obra/planta o si nunca se pudo calcular
+        // antes -- evita gastar cuota del API en cada edicion (ej. solo tocar el descuento).
+        boolean obraOplantaCambio = !java.util.Objects.equals(cotizacion.getObra() != null ? cotizacion.getObra().getId() : null, request.getObraId())
+                || !java.util.Objects.equals(cotizacion.getPlantaId(), request.getPlantaId());
+        Obra obraNueva = request.getObraId() != null ? obraService.buscarOFallar(request.getObraId()) : null;
+        BigDecimal distanciaKm = (obraOplantaCambio || cotizacion.getDistanciaKm() == null)
+                ? calcularDistanciaKm(obraNueva, tarifas)
+                : cotizacion.getDistanciaKm();
+
         cotizacion.setCliente(clienteService.buscarOFallar(request.getClienteId()));
-        cotizacion.setObra(request.getObraId() != null ? obraService.buscarOFallar(request.getObraId()) : null);
+        cotizacion.setObra(obraNueva);
         cotizacion.setContacto(request.getContactoId() != null ? buscarContactoOFallar(request.getContactoId()) : null);
         cotizacion.setPlantaId(request.getPlantaId());
         cotizacion.setAsesor(request.getAsesorId() != null ? asesorService.buscarOFallar(request.getAsesorId()) : null);
         cotizacion.setVolumenM3(volumenTotal);
         if (request.getTipoServicio() != null) cotizacion.setTipoServicio(request.getTipoServicio());
         cotizacion.setFechaSuministroEstimada(request.getFechaSuministroEstimada());
+        cotizacion.setHorarioEntrega(request.getHorarioEntrega());
+        cotizacion.setElementoConstructivoId(request.getElementoConstructivoId());
+        cotizacion.setDistanciaKm(distanciaKm);
         if (request.getFormaPago() != null) cotizacion.setFormaPago(request.getFormaPago());
         cotizacion.setRequiereFactura(requiereFactura);
         cotizacion.setPorcentajeDescuento(descuento);
@@ -261,6 +281,9 @@ public class CotizacionService {
                 .volumenM3(origen.getVolumenM3())
                 .tipoServicio(origen.getTipoServicio())
                 .fechaSuministroEstimada(origen.getFechaSuministroEstimada())
+                .horarioEntrega(origen.getHorarioEntrega())
+                .elementoConstructivoId(origen.getElementoConstructivoId())
+                .distanciaKm(origen.getDistanciaKm())
                 .formaPago(origen.getFormaPago())
                 .requiereFactura(origen.getRequiereFactura())
                 .porcentajeDescuento(origen.getPorcentajeDescuento())
@@ -319,6 +342,9 @@ public class CotizacionService {
                 .volumenPendienteM3(cotizacion.getVolumenM3())
                 .tipoServicio(cotizacion.getTipoServicio())
                 .fechaProgramada(request.getFechaProgramada())
+                .horarioEntrega(cotizacion.getHorarioEntrega())
+                .elementoConstructivoId(cotizacion.getElementoConstructivoId())
+                .distanciaKm(cotizacion.getDistanciaKm())
                 .condicionPago(request.getCondicionPago())
                 .diasCredito(request.getDiasCredito())
                 .creadoPorUsuario(usuario)
@@ -407,12 +433,14 @@ public class CotizacionService {
                     throw new IllegalArgumentException("productoId es obligatorio para lineas tipo 'producto'");
                 }
                 BigDecimal volumen = item.getVolumenM3();
+                BigDecimal descuentoLinea = item.getPorcentajeDescuentoLinea() != null ? item.getPorcentajeDescuentoLinea() : BigDecimal.ZERO;
                 lineas.add(CotizacionDetalle.builder()
                         .tipoLinea("producto")
                         .productoId(item.getProductoId())
                         .volumenM3(volumen)
                         .precioUnitario(item.getPrecioUnitario())
-                        .precioTotal(precioConDescuento(item.getPrecioUnitario(), volumen, descuento))
+                        .precioTotal(precioConDescuento(item.getPrecioUnitario(), volumen, descuento, descuentoLinea))
+                        .porcentajeDescuentoLinea(descuentoLinea)
                         .descripcion(item.getDescripcion())
                         .build());
 
@@ -485,10 +513,13 @@ public class CotizacionService {
         return "producto".equals(tipoLinea(item));
     }
 
-    private BigDecimal precioConDescuento(BigDecimal precioUnitario, BigDecimal volumen, BigDecimal descuento) {
-        BigDecimal precioConDescuento = precioUnitario
-                .multiply(BigDecimal.ONE.subtract(descuento.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)));
-        return precioConDescuento.multiply(volumen).setScale(2, RoundingMode.HALF_UP);
+    /** Descuento general (cabecera) y descuento de linea se combinan multiplicativamente (igual que
+     * "10% de descuento y luego 5% extra sobre lo ya rebajado" en retail) -- no aditivo, para que
+     * nunca se pueda pasar de 100% combinando ambos por accidente. */
+    private BigDecimal precioConDescuento(BigDecimal precioUnitario, BigDecimal volumen, BigDecimal descuento, BigDecimal descuentoLinea) {
+        BigDecimal factorGeneral = BigDecimal.ONE.subtract(descuento.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
+        BigDecimal factorLinea = BigDecimal.ONE.subtract(descuentoLinea.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
+        return precioUnitario.multiply(factorGeneral).multiply(factorLinea).multiply(volumen).setScale(2, RoundingMode.HALF_UP);
     }
 
     /** "Cuantos m3 en total esta solicitando el cliente" = solo lineas de producto (bombeo/flete_vacio son cargos, no concreto). */
@@ -526,6 +557,24 @@ public class CotizacionService {
             throw new AccessDeniedException("El descuento de " + valor + "% esta fuera del rango permitido (" + min + "% - " + max
                     + "%) para cotizaciones " + (factura ? "con" : "sin") + " factura; se requiere el permiso cotizaciones.aplicar_descuento_especial");
         }
+    }
+
+    /** Cualquier descuento de linea (aparte del general ya validado en validarDescuento) requiere el
+     * mismo permiso especial -- si no, seria una forma trivial de saltarse el rango de descuento
+     * general ya negociado (0-6%/8-11%) agregando "descuento extra" por producto sin control. */
+    private void validarDescuentosLinea(List<CotizacionItemRequest> items, JwtPrincipal principal) {
+        boolean tieneDescuentoLinea = items != null && items.stream()
+                .anyMatch(item -> item.getPorcentajeDescuentoLinea() != null && item.getPorcentajeDescuentoLinea().signum() > 0);
+        if (tieneDescuentoLinea && (principal == null || !principal.tienePermiso("cotizaciones.aplicar_descuento_especial"))) {
+            throw new AccessDeniedException("Aplicar un descuento extra por producto requiere el permiso cotizaciones.aplicar_descuento_especial");
+        }
+    }
+
+    /** Distancia real por carretera obra->planta, solo si ambas ubicaciones se conocen (ver
+     * GoogleMapsClient) -- nunca lanza, si falla algo regresa null y la cotizacion se guarda igual. */
+    private BigDecimal calcularDistanciaKm(Obra obra, CatalogoClient.PlantaTarifas tarifas) {
+        if (obra == null || tarifas == null) return null;
+        return googleMapsClient.calcularDistanciaKm(obra.getLatitud(), obra.getLongitud(), tarifas.getLatitud(), tarifas.getLongitud());
     }
 
     /** Tasa de IVA configurada en la planta (Planta.porcentajeIva, catalogo-service) -- puede
@@ -585,6 +634,9 @@ public class CotizacionService {
                 .volumenM3(cotizacion.getVolumenM3())
                 .tipoServicio(cotizacion.getTipoServicio())
                 .fechaSuministroEstimada(cotizacion.getFechaSuministroEstimada())
+                .horarioEntrega(cotizacion.getHorarioEntrega())
+                .elementoConstructivoId(cotizacion.getElementoConstructivoId())
+                .distanciaKm(cotizacion.getDistanciaKm())
                 .formaPago(cotizacion.getFormaPago())
                 .requiereFactura(cotizacion.getRequiereFactura())
                 .porcentajeDescuento(cotizacion.getPorcentajeDescuento())
@@ -616,11 +668,17 @@ public class CotizacionService {
                 .volumenM3(linea.getVolumenM3())
                 .precioUnitario(linea.getPrecioUnitario())
                 .precioTotal(linea.getPrecioTotal())
+                .porcentajeDescuentoLinea(linea.getPorcentajeDescuentoLinea())
                 .descripcion(linea.getDescripcion())
                 .build();
     }
 
     private PedidoResponse toPedidoResponse(Pedido pedido, List<PedidoDetalle> lineas) {
+        BigDecimal montoTotal = lineas.stream()
+                .map(PedidoDetalle::getPrecioTotal)
+                .filter(java.util.Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
         return PedidoResponse.builder()
                 .id(pedido.getId())
                 .folio(pedido.getFolio())
@@ -637,6 +695,11 @@ public class CotizacionService {
                 .volumenPendienteM3(pedido.getVolumenPendienteM3())
                 .tipoServicio(pedido.getTipoServicio())
                 .fechaProgramada(pedido.getFechaProgramada())
+                .horarioEntrega(pedido.getHorarioEntrega())
+                .elementoConstructivoId(pedido.getElementoConstructivoId())
+                .distanciaKm(pedido.getDistanciaKm())
+                .formaPago(pedido.getCotizacion() != null ? pedido.getCotizacion().getFormaPago() : null)
+                .montoTotal(montoTotal)
                 .condicionPago(pedido.getCondicionPago())
                 .diasCredito(pedido.getDiasCredito())
                 .estatusPagoAutorizacion(pedido.getEstatusPagoAutorizacion())

@@ -43,4 +43,10 @@ public class CotizacionItemRequest {
 
     /** etiqueta libre, ej. "Bombeo pluma rentada" */
     private String descripcion;
+
+    /** % de descuento EXTRA de esta linea, aparte del descuento general de la cotizacion. Solo
+     * aplica si tipoLinea=producto. Cualquier valor > 0 requiere el permiso
+     * cotizaciones.aplicar_descuento_especial (ver CotizacionService.validarDescuentosLinea). */
+    @DecimalMin(value = "0.0", message = "El descuento de linea no puede ser negativo")
+    private BigDecimal porcentajeDescuentoLinea;
 }

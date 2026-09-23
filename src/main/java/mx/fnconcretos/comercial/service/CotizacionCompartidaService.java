@@ -38,6 +38,7 @@ public class CotizacionCompartidaService {
     private static final int LONGITUD_TOKEN = 10;
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final DateTimeFormatter FORMATO_FECHA_ENTREGA = DateTimeFormatter.ofPattern("dd / MM / yyyy");
+    private static final DateTimeFormatter FORMATO_HORA_ENTREGA = DateTimeFormatter.ofPattern("hh:mm a");
 
     private final CotizacionCompartidaTokenRepository tokenRepository;
     private final CotizacionRepository cotizacionRepository;
@@ -112,7 +113,7 @@ public class CotizacionCompartidaService {
                 .planta(plantaNombre)
                 .empresa(empresa)
                 .cliente(construirCliente(cotizacion))
-                .entrega(construirEntrega(cotizacion))
+                .entrega(construirEntrega(cotizacion, bearerToken))
                 .lineas(construirLineas(lineas, bearerToken))
                 .totalVolumen(cotizacion.getVolumenM3())
                 .totales(construirTotales(cotizacion))
@@ -136,7 +137,7 @@ public class CotizacionCompartidaService {
                 .build();
     }
 
-    private CotizacionPublicaResponse.EntregaInfo construirEntrega(Cotizacion cotizacion) {
+    private CotizacionPublicaResponse.EntregaInfo construirEntrega(Cotizacion cotizacion, String bearerToken) {
         Obra obra = cotizacion.getObra();
         String direccion = null;
         if (obra != null) {
@@ -150,16 +151,32 @@ public class CotizacionCompartidaService {
         String fechaHoraServicio = cotizacion.getFechaSuministroEstimada() != null
                 ? cotizacion.getFechaSuministroEstimada().format(FORMATO_FECHA_ENTREGA)
                 : null;
+        if (cotizacion.getHorarioEntrega() != null) {
+            String hora = cotizacion.getHorarioEntrega().format(FORMATO_HORA_ENTREGA);
+            fechaHoraServicio = fechaHoraServicio != null ? fechaHoraServicio + " · " + hora : hora;
+        }
 
         return CotizacionPublicaResponse.EntregaInfo.builder()
                 .direccion(direccion)
-                .elemento(null)
+                .elemento(resolverNombreElementoConstructivo(cotizacion.getElementoConstructivoId(), bearerToken))
                 .notas(null)
                 .fechaHoraServicio(fechaHoraServicio)
                 .condicionPago(etiquetaFormaPago(cotizacion.getFormaPago()))
                 .bomba("bomba".equals(cotizacion.getTipoServicio()) ? "Sí" : null)
                 .autorizo(null)
+                .distanciaKm(cotizacion.getDistanciaKm() != null ? cotizacion.getDistanciaKm() + " km" : null)
                 .build();
+    }
+
+    private String resolverNombreElementoConstructivo(Long elementoConstructivoId, String bearerToken) {
+        if (elementoConstructivoId == null) return null;
+        try {
+            CatalogoClient.ElementoConstructivoInfo elemento = catalogoClient.obtenerElementoConstructivo(elementoConstructivoId, bearerToken);
+            return elemento != null ? elemento.getNombre() : null;
+        } catch (Exception e) {
+            log.warn("No se pudo resolver el elemento constructivo {} para el snapshot de cotizacion: {}", elementoConstructivoId, e.getMessage());
+            return null;
+        }
     }
 
     private String etiquetaFormaPago(String formaPago) {

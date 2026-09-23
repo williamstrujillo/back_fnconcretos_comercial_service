@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -32,6 +33,9 @@ public class CotizacionResponse {
     private List<CotizacionItemResponse> productos;
     private String tipoServicio;
     private LocalDate fechaSuministroEstimada;
+    private LocalTime horarioEntrega;
+    private Long elementoConstructivoId;
+    private BigDecimal distanciaKm;
     private String formaPago;
     private Boolean requiereFactura;
     private BigDecimal porcentajeDescuento;

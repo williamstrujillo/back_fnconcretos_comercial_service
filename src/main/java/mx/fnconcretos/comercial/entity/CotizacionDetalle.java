@@ -52,6 +52,14 @@ public class CotizacionDetalle {
     @Builder.Default
     private BigDecimal precioTotal = BigDecimal.ZERO;
 
+    /** % de descuento EXTRA de esta linea, aparte del descuento general de la cotizacion -- solo
+     * aplica a tipoLinea=producto (ver CotizacionService.calcularLineas). Cualquier valor > 0
+     * requiere el permiso cotizaciones.aplicar_descuento_especial, igual que salirse del rango del
+     * descuento general (ver CotizacionService.validarDescuentosLinea). */
+    @Column(name = "porcentaje_descuento_linea", precision = 5, scale = 2)
+    @Builder.Default
+    private BigDecimal porcentajeDescuentoLinea = BigDecimal.ZERO;
+
     /** etiqueta libre para lineas que no son producto, ej. "Bombeo", "Flete por vacio" */
     @Column(name = "descripcion", length = 120)
     private String descripcion;

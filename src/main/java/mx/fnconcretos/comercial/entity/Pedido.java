@@ -17,6 +17,7 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Entity
 @Table(name = "pedidos")
@@ -72,6 +73,20 @@ public class Pedido {
 
     @Column(name = "fecha_programada")
     private LocalDate fechaProgramada;
+
+    /** Copiado de Cotizacion.horarioEntrega al convertir -- base de la deteccion de "pedidos
+     * cruzados" en programacion de pedidos (operaciones-service la lee via PedidoResponse). */
+    @Column(name = "horario_entrega")
+    private LocalTime horarioEntrega;
+
+    /** Copiado de Cotizacion.elementoConstructivoId al convertir. Elemento constructivo en
+     * catalogo-service; solo el id. */
+    @Column(name = "elemento_constructivo_id")
+    private Long elementoConstructivoId;
+
+    /** Copiado de Cotizacion.distanciaKm al convertir. */
+    @Column(name = "distancia_km", precision = 8, scale = 2)
+    private BigDecimal distanciaKm;
 
     /** liquidado, anticipo, credito, liquidar_obra */
     @Column(name = "condicion_pago", nullable = false, length = 20)
