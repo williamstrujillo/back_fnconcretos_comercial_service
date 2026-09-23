@@ -353,6 +353,11 @@ public class CotizacionService {
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        // El asesor puede editar o borrar la linea de flete_vacio que el sistema sugiere (ver rama
+        // "flete_vacio" abajo) -- si el request ya trae una explicita, se respeta tal cual y no se
+        // genera ninguna automatica encima (evitaria duplicarla).
+        boolean fleteVacioManual = items.stream().anyMatch(item -> "flete_vacio".equals(tipoLinea(item)));
+
         List<CotizacionDetalle> lineas = new java.util.ArrayList<>();
         for (CotizacionItemRequest item : items) {
             String tipo = tipoLinea(item);
@@ -370,21 +375,23 @@ public class CotizacionService {
                         .descripcion(item.getDescripcion())
                         .build());
 
-                BigDecimal capacidad = tarifas.getCapacidadReferenciaM3();
-                // Solo se cobra vacio si el pedido completo NO alcanza la capacidad de
-                // referencia (ej. 5m3 de 7m3 -> vacio de 2m3). Un pedido de 20m3 no genera
-                // vacio aunque el ultimo viaje parcial no llene la olla: el cargo es por
-                // pedido chico, no por como se reparta en viajes.
-                if (capacidad != null && capacidad.signum() > 0 && volumen.compareTo(capacidad) < 0) {
-                    BigDecimal vacio = capacidad.subtract(volumen);
-                    BigDecimal precioVacio = tarifas.getPrecioPorM3Vacio() != null ? tarifas.getPrecioPorM3Vacio() : BigDecimal.ZERO;
-                    lineas.add(CotizacionDetalle.builder()
-                            .tipoLinea("flete_vacio")
-                            .volumenM3(vacio)
-                            .precioUnitario(precioVacio)
-                            .precioTotal(vacio.multiply(precioVacio).setScale(2, RoundingMode.HALF_UP))
-                            .descripcion("Flete por vacio")
-                            .build());
+                if (!fleteVacioManual) {
+                    BigDecimal capacidad = tarifas.getCapacidadReferenciaM3();
+                    // Solo se cobra vacio si el pedido completo NO alcanza la capacidad de
+                    // referencia (ej. 5m3 de 7m3 -> vacio de 2m3). Un pedido de 20m3 no genera
+                    // vacio aunque el ultimo viaje parcial no llene la olla: el cargo es por
+                    // pedido chico, no por como se reparta en viajes.
+                    if (capacidad != null && capacidad.signum() > 0 && volumen.compareTo(capacidad) < 0) {
+                        BigDecimal vacio = capacidad.subtract(volumen);
+                        BigDecimal precioVacio = tarifas.getPrecioPorM3Vacio() != null ? tarifas.getPrecioPorM3Vacio() : BigDecimal.ZERO;
+                        lineas.add(CotizacionDetalle.builder()
+                                .tipoLinea("flete_vacio")
+                                .volumenM3(vacio)
+                                .precioUnitario(precioVacio)
+                                .precioTotal(vacio.multiply(precioVacio).setScale(2, RoundingMode.HALF_UP))
+                                .descripcion("Flete por vacio")
+                                .build());
+                    }
                 }
             } else if ("bombeo".equals(tipo)) {
                 BigDecimal volumen = item.getVolumenM3() != null ? item.getVolumenM3() : volumenTotalProducto;
@@ -394,6 +401,20 @@ public class CotizacionService {
                         .precioUnitario(item.getPrecioUnitario())
                         .precioTotal(volumen.multiply(item.getPrecioUnitario()).setScale(2, RoundingMode.HALF_UP))
                         .descripcion(item.getDescripcion() != null ? item.getDescripcion() : "Bombeo")
+                        .build());
+            } else if ("flete_vacio".equals(tipo)) {
+                // El asesor edito (o creo a mano) esta linea -- se respeta el volumen/precio que
+                // mande, completando con el default de la planta solo lo que falte (mismo
+                // criterio que bombeo).
+                BigDecimal precioVacioDefault = tarifas.getPrecioPorM3Vacio() != null ? tarifas.getPrecioPorM3Vacio() : BigDecimal.ZERO;
+                BigDecimal volumen = item.getVolumenM3() != null ? item.getVolumenM3() : BigDecimal.ZERO;
+                BigDecimal precioUnitario = item.getPrecioUnitario() != null ? item.getPrecioUnitario() : precioVacioDefault;
+                lineas.add(CotizacionDetalle.builder()
+                        .tipoLinea("flete_vacio")
+                        .volumenM3(volumen)
+                        .precioUnitario(precioUnitario)
+                        .precioTotal(volumen.multiply(precioUnitario).setScale(2, RoundingMode.HALF_UP))
+                        .descripcion(item.getDescripcion() != null ? item.getDescripcion() : "Flete por vacio")
                         .build());
             } else {
                 if (item.getVolumenM3() == null) {

@@ -13,7 +13,12 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class CotizacionItemRequest {
 
-    /** producto (default), bombeo, otro. flete_vacio nunca se manda: la genera el sistema. */
+    /**
+     * producto (default), bombeo, flete_vacio, otro. flete_vacio normalmente lo genera el
+     * sistema solo (ver CotizacionService.calcularLineas) -- si el request ya trae una linea
+     * flete_vacio explicita (el asesor la edito o la borro), se respeta esa en vez de generar
+     * una automatica encima.
+     */
     private String tipoLinea;
 
     /** Obligatorio solo si tipoLinea=producto */
