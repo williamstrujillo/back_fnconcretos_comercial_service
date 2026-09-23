@@ -88,6 +88,7 @@ public class CotizacionPublicaResponse {
     @Builder
     public static class TotalesInfo {
         private BigDecimal subtotal;
+        private BigDecimal iva;
         private BigDecimal total;
     }
 

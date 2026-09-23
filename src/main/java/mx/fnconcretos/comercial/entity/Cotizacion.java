@@ -84,6 +84,28 @@ public class Cotizacion {
     @Builder.Default
     private BigDecimal precioUnitario = BigDecimal.ZERO;
 
+    /** Suma de las lineas ya con descuento aplicado, SIN iva -- lo que antes era "precioTotal" a
+     * secas antes de que existiera el concepto de IVA. */
+    @Column(name = "subtotal", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal subtotal = BigDecimal.ZERO;
+
+    /** subtotal * porcentajeIva/100, solo si requiereFactura=true; 0 si no. */
+    @Column(name = "iva", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal iva = BigDecimal.ZERO;
+
+    /** Tasa realmente usada al calcular iva (snapshot de Planta.porcentajeIva al guardar) -- para
+     * que una cotizacion vieja no cambie de total si la tasa de la planta cambia despues. Null si
+     * requiereFactura=false (no aplica). */
+    @Column(name = "porcentaje_iva", precision = 5, scale = 2)
+    private BigDecimal porcentajeIva;
+
+    /** subtotal + iva -- el monto real a cobrar. Se sigue llamando precioTotal por compatibilidad
+     * con todo lo que ya lo consume (Pedido.registrarEntrega, estado de cuenta, documentos
+     * impresos, etc.) -- antes de que existiera iva, precioTotal YA representaba "el total a
+     * cobrar", asi que este cambio es aditivo: para requiereFactura=false, iva=0 y precioTotal no
+     * cambia de significado. */
     @Column(name = "precio_total", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal precioTotal = BigDecimal.ZERO;

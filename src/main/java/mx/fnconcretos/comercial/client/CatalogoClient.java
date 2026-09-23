@@ -67,6 +67,7 @@ public class CatalogoClient {
         private BigDecimal capacidadReferenciaM3;
         private BigDecimal precioPorM3Vacio;
         private BigDecimal precioPorM3Bombeo;
+        private BigDecimal porcentajeIva;
     }
 
     @Data

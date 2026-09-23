@@ -37,6 +37,9 @@ public class CotizacionResponse {
     private BigDecimal porcentajeDescuento;
     private BigDecimal precioUnitario;
     private BigDecimal precioUnitarioConDescuento;
+    private BigDecimal subtotal;
+    private BigDecimal iva;
+    private BigDecimal porcentajeIva;
     private BigDecimal montoTotal;
     private String estatus;
     private Long cotizacionOrigenId;
