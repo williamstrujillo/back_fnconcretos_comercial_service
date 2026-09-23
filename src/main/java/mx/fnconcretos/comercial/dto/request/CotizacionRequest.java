@@ -30,7 +30,11 @@ public class CotizacionRequest {
 
     private Long asesorId;
 
-    /** Lineas de la cotizacion: productos, bombeo, etc. El flete por vacio se calcula solo, no se manda aqui. */
+    /**
+     * Lineas de la cotizacion: productos, bombeo, flete_vacio, etc. El flete por vacio se calcula
+     * solo cuando no se incluye aqui explicitamente -- si ya se mando una linea flete_vacio (el
+     * asesor la edito o la borro), se respeta esa en vez de regenerarla.
+     */
     @NotEmpty(message = "Debe indicar al menos un producto en 'productos'")
     @Valid
     private List<CotizacionItemRequest> productos;

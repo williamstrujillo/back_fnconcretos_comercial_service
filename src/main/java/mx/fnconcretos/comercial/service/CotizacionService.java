@@ -93,7 +93,7 @@ public class CotizacionService {
         validarDescuento(descuento, request.getRequiereFactura(), principal);
 
         CatalogoClient.PlantaTarifas tarifas = catalogoClient.obtenerTarifas(request.getPlantaId(), bearerToken);
-        List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento);
+        List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento, principal);
         BigDecimal volumenTotal = volumenTotalProducto(lineas);
         BigDecimal precioTotal = precioTotalLineas(lineas);
         BigDecimal precioUnitarioPrimero = precioUnitarioPrimerProducto(lineas);
@@ -176,7 +176,7 @@ public class CotizacionService {
         validarDescuento(descuento, request.getRequiereFactura(), principal);
 
         CatalogoClient.PlantaTarifas tarifas = catalogoClient.obtenerTarifas(request.getPlantaId(), bearerToken);
-        List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento);
+        List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento, principal);
         BigDecimal volumenTotal = volumenTotalProducto(lineas);
         BigDecimal precioTotal = precioTotalLineas(lineas);
         BigDecimal precioUnitarioPrimero = precioUnitarioPrimerProducto(lineas);
@@ -335,6 +335,11 @@ public class CotizacionService {
         return toPedidoResponse(guardado, lineasPedido);
     }
 
+    /** Rol que no puede modificar el costo (precioUnitario) del flete por vacio -- puede editar el
+     * volumen, pero el precio siempre se fuerza a la tarifa de la planta (se ignora en silencio lo
+     * que mande, mismo criterio que Cliente.origenCaptacion="asignado" fuerza 1% de comision). */
+    private static final String ROL_ASESOR_COMERCIAL = "Asesor Comercial";
+
     /**
      * Expande "productos" a las lineas reales a guardar: cada linea 'producto' genera
      * ademas, si aplica, su linea automatica de 'flete_vacio' (capacidadReferenciaM3/
@@ -342,7 +347,7 @@ public class CotizacionService {
      * toman el volumen total de las lineas 'producto'. El descuento solo aplica a
      * lineas 'producto' (bombeo/flete_vacio son cargos logisticos, no negociables).
      */
-    private List<CotizacionDetalle> calcularLineas(List<CotizacionItemRequest> items, CatalogoClient.PlantaTarifas tarifas, BigDecimal descuento) {
+    private List<CotizacionDetalle> calcularLineas(List<CotizacionItemRequest> items, CatalogoClient.PlantaTarifas tarifas, BigDecimal descuento, JwtPrincipal principal) {
         BigDecimal volumenTotalProducto = items.stream()
                 .filter(this::esProducto)
                 .map(item -> {
@@ -352,6 +357,11 @@ public class CotizacionService {
                     return item.getVolumenM3();
                 })
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // El asesor puede editar o borrar la linea de flete_vacio que el sistema sugiere (ver rama
+        // "flete_vacio" abajo) -- si el request ya trae una explicita, se respeta tal cual y no se
+        // genera ninguna automatica encima (evitaria duplicarla).
+        boolean fleteVacioManual = items.stream().anyMatch(item -> "flete_vacio".equals(tipoLinea(item)));
 
         List<CotizacionDetalle> lineas = new java.util.ArrayList<>();
         for (CotizacionItemRequest item : items) {
@@ -370,21 +380,23 @@ public class CotizacionService {
                         .descripcion(item.getDescripcion())
                         .build());
 
-                BigDecimal capacidad = tarifas.getCapacidadReferenciaM3();
-                // Solo se cobra vacio si el pedido completo NO alcanza la capacidad de
-                // referencia (ej. 5m3 de 7m3 -> vacio de 2m3). Un pedido de 20m3 no genera
-                // vacio aunque el ultimo viaje parcial no llene la olla: el cargo es por
-                // pedido chico, no por como se reparta en viajes.
-                if (capacidad != null && capacidad.signum() > 0 && volumen.compareTo(capacidad) < 0) {
-                    BigDecimal vacio = capacidad.subtract(volumen);
-                    BigDecimal precioVacio = tarifas.getPrecioPorM3Vacio() != null ? tarifas.getPrecioPorM3Vacio() : BigDecimal.ZERO;
-                    lineas.add(CotizacionDetalle.builder()
-                            .tipoLinea("flete_vacio")
-                            .volumenM3(vacio)
-                            .precioUnitario(precioVacio)
-                            .precioTotal(vacio.multiply(precioVacio).setScale(2, RoundingMode.HALF_UP))
-                            .descripcion("Flete por vacio")
-                            .build());
+                if (!fleteVacioManual) {
+                    BigDecimal capacidad = tarifas.getCapacidadReferenciaM3();
+                    // Solo se cobra vacio si el pedido completo NO alcanza la capacidad de
+                    // referencia (ej. 5m3 de 7m3 -> vacio de 2m3). Un pedido de 20m3 no genera
+                    // vacio aunque el ultimo viaje parcial no llene la olla: el cargo es por
+                    // pedido chico, no por como se reparta en viajes.
+                    if (capacidad != null && capacidad.signum() > 0 && volumen.compareTo(capacidad) < 0) {
+                        BigDecimal vacio = capacidad.subtract(volumen);
+                        BigDecimal precioVacio = tarifas.getPrecioPorM3Vacio() != null ? tarifas.getPrecioPorM3Vacio() : BigDecimal.ZERO;
+                        lineas.add(CotizacionDetalle.builder()
+                                .tipoLinea("flete_vacio")
+                                .volumenM3(vacio)
+                                .precioUnitario(precioVacio)
+                                .precioTotal(vacio.multiply(precioVacio).setScale(2, RoundingMode.HALF_UP))
+                                .descripcion("Flete por vacio")
+                                .build());
+                    }
                 }
             } else if ("bombeo".equals(tipo)) {
                 BigDecimal volumen = item.getVolumenM3() != null ? item.getVolumenM3() : volumenTotalProducto;
@@ -394,6 +406,24 @@ public class CotizacionService {
                         .precioUnitario(item.getPrecioUnitario())
                         .precioTotal(volumen.multiply(item.getPrecioUnitario()).setScale(2, RoundingMode.HALF_UP))
                         .descripcion(item.getDescripcion() != null ? item.getDescripcion() : "Bombeo")
+                        .build());
+            } else if ("flete_vacio".equals(tipo)) {
+                // El asesor edito (o creo a mano) esta linea -- se respeta el volumen/precio que
+                // mande, completando con el default de la planta solo lo que falte (mismo
+                // criterio que bombeo). Excepcion: Asesor Comercial no puede tocar el costo, el
+                // precio siempre es la tarifa de la planta sin importar lo que haya mandado.
+                BigDecimal precioVacioDefault = tarifas.getPrecioPorM3Vacio() != null ? tarifas.getPrecioPorM3Vacio() : BigDecimal.ZERO;
+                BigDecimal volumen = item.getVolumenM3() != null ? item.getVolumenM3() : BigDecimal.ZERO;
+                boolean esAsesorComercial = principal != null && ROL_ASESOR_COMERCIAL.equals(principal.rol());
+                BigDecimal precioUnitario = !esAsesorComercial && item.getPrecioUnitario() != null
+                        ? item.getPrecioUnitario()
+                        : precioVacioDefault;
+                lineas.add(CotizacionDetalle.builder()
+                        .tipoLinea("flete_vacio")
+                        .volumenM3(volumen)
+                        .precioUnitario(precioUnitario)
+                        .precioTotal(volumen.multiply(precioUnitario).setScale(2, RoundingMode.HALF_UP))
+                        .descripcion(item.getDescripcion() != null ? item.getDescripcion() : "Flete por vacio")
                         .build());
             } else {
                 if (item.getVolumenM3() == null) {
