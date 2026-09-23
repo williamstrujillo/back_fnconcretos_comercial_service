@@ -58,11 +58,17 @@ public class CotizacionService {
     private final CotizacionCompartidaService cotizacionCompartidaService;
     private final BitacoraService bitacoraService;
 
-    @Value("${negocio.descuento.max-efectivo}")
-    private BigDecimal descuentoMaxEfectivo;
+    @Value("${negocio.descuento.min-sin-factura}")
+    private BigDecimal descuentoMinSinFactura;
 
-    @Value("${negocio.descuento.max-factura}")
-    private BigDecimal descuentoMaxFactura;
+    @Value("${negocio.descuento.max-sin-factura}")
+    private BigDecimal descuentoMaxSinFactura;
+
+    @Value("${negocio.descuento.min-con-factura}")
+    private BigDecimal descuentoMinConFactura;
+
+    @Value("${negocio.descuento.max-con-factura}")
+    private BigDecimal descuentoMaxConFactura;
 
     @Transactional(readOnly = true)
     public List<CotizacionResponse> listar(Long clienteId, String estatus, String q) {
@@ -95,8 +101,11 @@ public class CotizacionService {
         CatalogoClient.PlantaTarifas tarifas = catalogoClient.obtenerTarifas(request.getPlantaId(), bearerToken);
         List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento, principal);
         BigDecimal volumenTotal = volumenTotalProducto(lineas);
-        BigDecimal precioTotal = precioTotalLineas(lineas);
+        BigDecimal subtotal = precioTotalLineas(lineas);
         BigDecimal precioUnitarioPrimero = precioUnitarioPrimerProducto(lineas);
+        boolean requiereFactura = Boolean.TRUE.equals(request.getRequiereFactura());
+        BigDecimal porcentajeIvaAplicado = requiereFactura ? porcentajeIvaDePlanta(tarifas) : null;
+        BigDecimal iva = calcularIva(subtotal, porcentajeIvaAplicado);
 
         Cotizacion cotizacion = Cotizacion.builder()
                 .folio(generarFolio())
@@ -109,10 +118,13 @@ public class CotizacionService {
                 .tipoServicio(request.getTipoServicio() != null ? request.getTipoServicio() : "directo")
                 .fechaSuministroEstimada(request.getFechaSuministroEstimada())
                 .formaPago(request.getFormaPago() != null ? request.getFormaPago() : "efectivo")
-                .requiereFactura(request.getRequiereFactura() != null ? request.getRequiereFactura() : false)
+                .requiereFactura(requiereFactura)
                 .porcentajeDescuento(descuento)
                 .precioUnitario(precioUnitarioPrimero)
-                .precioTotal(precioTotal)
+                .subtotal(subtotal)
+                .iva(iva)
+                .porcentajeIva(porcentajeIvaAplicado)
+                .precioTotal(subtotal.add(iva))
                 .observaciones(request.getObservaciones())
                 .creadoPorUsuario(principal != null ? principal.user() : null)
                 .actualizadoPorUsuario(principal != null ? principal.user() : null)
@@ -178,8 +190,11 @@ public class CotizacionService {
         CatalogoClient.PlantaTarifas tarifas = catalogoClient.obtenerTarifas(request.getPlantaId(), bearerToken);
         List<CotizacionDetalle> lineas = calcularLineas(request.getProductos(), tarifas, descuento, principal);
         BigDecimal volumenTotal = volumenTotalProducto(lineas);
-        BigDecimal precioTotal = precioTotalLineas(lineas);
+        BigDecimal subtotal = precioTotalLineas(lineas);
         BigDecimal precioUnitarioPrimero = precioUnitarioPrimerProducto(lineas);
+        boolean requiereFactura = request.getRequiereFactura() != null ? request.getRequiereFactura() : Boolean.TRUE.equals(cotizacion.getRequiereFactura());
+        BigDecimal porcentajeIvaAplicado = requiereFactura ? porcentajeIvaDePlanta(tarifas) : null;
+        BigDecimal iva = calcularIva(subtotal, porcentajeIvaAplicado);
 
         cotizacion.setCliente(clienteService.buscarOFallar(request.getClienteId()));
         cotizacion.setObra(request.getObraId() != null ? obraService.buscarOFallar(request.getObraId()) : null);
@@ -190,10 +205,13 @@ public class CotizacionService {
         if (request.getTipoServicio() != null) cotizacion.setTipoServicio(request.getTipoServicio());
         cotizacion.setFechaSuministroEstimada(request.getFechaSuministroEstimada());
         if (request.getFormaPago() != null) cotizacion.setFormaPago(request.getFormaPago());
-        if (request.getRequiereFactura() != null) cotizacion.setRequiereFactura(request.getRequiereFactura());
+        cotizacion.setRequiereFactura(requiereFactura);
         cotizacion.setPorcentajeDescuento(descuento);
         cotizacion.setPrecioUnitario(precioUnitarioPrimero);
-        cotizacion.setPrecioTotal(precioTotal);
+        cotizacion.setSubtotal(subtotal);
+        cotizacion.setIva(iva);
+        cotizacion.setPorcentajeIva(porcentajeIvaAplicado);
+        cotizacion.setPrecioTotal(subtotal.add(iva));
         cotizacion.setObservaciones(request.getObservaciones());
         cotizacion.setActualizadoPorUsuario(principal != null ? principal.user() : null);
         cotizacion.setActualizadoEn(LocalDateTime.now());
@@ -310,7 +328,7 @@ public class CotizacionService {
 
         Pedido guardado = pedidoRepository.save(pedido);
 
-        List<PedidoDetalle> lineasPedido = lineasCotizacion.stream()
+        List<PedidoDetalle> lineasPedido = new java.util.ArrayList<>(lineasCotizacion.stream()
                 .map(linea -> PedidoDetalle.builder()
                         .pedido(guardado)
                         .tipoLinea(linea.getTipoLinea())
@@ -321,7 +339,25 @@ public class CotizacionService {
                         .precioTotal(linea.getPrecioTotal())
                         .descripcion(linea.getDescripcion())
                         .build())
-                .toList();
+                .toList());
+
+        // El pedido no tiene un campo de header para el total (ni subtotal/iva) -- su monto se
+        // deriva SIEMPRE sumando pedido_detalle.precioTotal (ver PedidoInfo.getImporteTotal en
+        // finanzas-service, y el frontend). Para que ese total siga incluyendo el IVA despues de
+        // convertir, se agrega una linea "otro" con el monto de iva ya calculado en la cotizacion
+        // -- mas simple que agregar subtotal/iva/total a Pedido y actualizar todo lo que ya deriva
+        // el total sumando lineas.
+        if (cotizacion.getIva() != null && cotizacion.getIva().signum() > 0) {
+            lineasPedido.add(PedidoDetalle.builder()
+                    .pedido(guardado)
+                    .tipoLinea("otro")
+                    .volumenSolicitadoM3(BigDecimal.ZERO)
+                    .volumenPendienteM3(BigDecimal.ZERO)
+                    .precioUnitario(cotizacion.getIva())
+                    .precioTotal(cotizacion.getIva())
+                    .descripcion("IVA (" + cotizacion.getPorcentajeIva() + "%)")
+                    .build());
+        }
         pedidoDetalleRepository.saveAll(lineasPedido);
 
         cotizacion.setEstatus("convertida");
@@ -475,15 +511,33 @@ public class CotizacionService {
                 .orElse(BigDecimal.ZERO);
     }
 
+    /** Rango habilitado (no min a max) segun requiereFactura, sin importar formaPago: sin factura
+     * descuentoMinSinFactura-descuentoMaxSinFactura (default 0-6%), con factura
+     * descuentoMinConFactura-descuentoMaxConFactura (default 8-11%). Salirse del rango (por
+     * arriba O por abajo) requiere el permiso cotizaciones.aplicar_descuento_especial. */
     private void validarDescuento(BigDecimal descuento, Boolean requiereFactura, JwtPrincipal principal) {
-        if (descuento == null || descuento.signum() <= 0) return;
-
+        BigDecimal valor = descuento != null ? descuento : BigDecimal.ZERO;
         boolean factura = Boolean.TRUE.equals(requiereFactura);
-        BigDecimal limite = factura ? descuentoMaxFactura : descuentoMaxEfectivo;
-        if (descuento.compareTo(limite) > 0 && (principal == null || !principal.tienePermiso("cotizaciones.aplicar_descuento_especial"))) {
-            throw new AccessDeniedException("El descuento de " + descuento + "% excede el limite de " + limite
-                    + "% para cotizaciones " + (factura ? "con" : "sin") + " factura; se requiere el permiso cotizaciones.aplicar_descuento_especial");
+        BigDecimal min = factura ? descuentoMinConFactura : descuentoMinSinFactura;
+        BigDecimal max = factura ? descuentoMaxConFactura : descuentoMaxSinFactura;
+
+        boolean fueraDeRango = valor.compareTo(min) < 0 || valor.compareTo(max) > 0;
+        if (fueraDeRango && (principal == null || !principal.tienePermiso("cotizaciones.aplicar_descuento_especial"))) {
+            throw new AccessDeniedException("El descuento de " + valor + "% esta fuera del rango permitido (" + min + "% - " + max
+                    + "%) para cotizaciones " + (factura ? "con" : "sin") + " factura; se requiere el permiso cotizaciones.aplicar_descuento_especial");
         }
+    }
+
+    /** Tasa de IVA configurada en la planta (Planta.porcentajeIva, catalogo-service) -- puede
+     * variar por planta, por eso no es una constante del sistema. 0 si la planta no trae el dato
+     * (nunca deberia pasar, tiene default 16 desde el modelo, pero por si acaso). */
+    private BigDecimal porcentajeIvaDePlanta(CatalogoClient.PlantaTarifas tarifas) {
+        return tarifas != null && tarifas.getPorcentajeIva() != null ? tarifas.getPorcentajeIva() : BigDecimal.ZERO;
+    }
+
+    private BigDecimal calcularIva(BigDecimal subtotal, BigDecimal porcentajeIva) {
+        if (porcentajeIva == null) return BigDecimal.ZERO;
+        return subtotal.multiply(porcentajeIva).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
     }
 
     private String generarFolio() {
@@ -538,6 +592,9 @@ public class CotizacionService {
                 .precioUnitarioConDescuento(cotizacion.getPrecioUnitario()
                         .multiply(BigDecimal.ONE.subtract(cotizacion.getPorcentajeDescuento().divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP)))
                         .setScale(2, RoundingMode.HALF_UP))
+                .subtotal(cotizacion.getSubtotal())
+                .iva(cotizacion.getIva())
+                .porcentajeIva(cotizacion.getPorcentajeIva())
                 .montoTotal(cotizacion.getPrecioTotal())
                 .estatus(cotizacion.getEstatus())
                 .cotizacionOrigenId(cotizacion.getCotizacionOrigen() != null ? cotizacion.getCotizacionOrigen().getId() : null)

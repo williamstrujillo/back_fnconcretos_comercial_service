@@ -115,7 +115,7 @@ public class CotizacionCompartidaService {
                 .entrega(construirEntrega(cotizacion))
                 .lineas(construirLineas(lineas, bearerToken))
                 .totalVolumen(cotizacion.getVolumenM3())
-                .totales(construirTotales(cotizacion, lineas))
+                .totales(construirTotales(cotizacion))
                 .vendedor(construirVendedor(cotizacion))
                 .observaciones(cotizacion.getObservaciones())
                 .build();
@@ -210,15 +210,13 @@ public class CotizacionCompartidaService {
         };
     }
 
-    private CotizacionPublicaResponse.TotalesInfo construirTotales(Cotizacion cotizacion, List<CotizacionDetalle> lineas) {
-        BigDecimal subtotal = lineas.stream()
-                .map(l -> (l.getVolumenM3() != null ? l.getVolumenM3() : BigDecimal.ZERO)
-                        .multiply(l.getPrecioUnitario() != null ? l.getPrecioUnitario() : BigDecimal.ZERO))
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                .setScale(2, RoundingMode.HALF_UP);
-
+    /** cotizacion.getSubtotal()/getIva()/getPrecioTotal() ya vienen calculados y guardados
+     * (CotizacionService.crear/actualizar) -- se reutilizan tal cual en vez de recalcular aqui,
+     * para que el snapshot compartido siempre coincida exactamente con lo que se guardo. */
+    private CotizacionPublicaResponse.TotalesInfo construirTotales(Cotizacion cotizacion) {
         return CotizacionPublicaResponse.TotalesInfo.builder()
-                .subtotal(subtotal)
+                .subtotal(cotizacion.getSubtotal())
+                .iva(cotizacion.getIva())
                 .total(cotizacion.getPrecioTotal())
                 .build();
     }
