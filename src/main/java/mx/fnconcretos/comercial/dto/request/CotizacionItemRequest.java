@@ -31,8 +31,14 @@ public class CotizacionItemRequest {
     @DecimalMin(value = "0.0", inclusive = false, message = "El volumen debe ser mayor a 0")
     private BigDecimal volumenM3;
 
+    /**
+     * inclusive=true (a diferencia de volumenM3) porque un flete_vacio con tarifa de planta en $0
+     * es un caso real (planta sin tarifa de vacio configurada, o Asesor Comercial cuyo precio se
+     * fuerza al default -- ver CotizacionService.calcularLineas) y debe poder guardarse tal cual,
+     * sin inventar un precio falso solo para pasar la validacion.
+     */
     @NotNull(message = "precioUnitario es obligatorio")
-    @DecimalMin(value = "0.0", inclusive = false, message = "El precio unitario debe ser mayor a 0")
+    @DecimalMin(value = "0.0", message = "El precio unitario no puede ser negativo")
     private BigDecimal precioUnitario;
 
     /** etiqueta libre, ej. "Bombeo pluma rentada" */
