@@ -73,11 +73,14 @@ public class CotizacionService {
     private BigDecimal descuentoMaxConFactura;
 
     @Transactional(readOnly = true)
-    public List<CotizacionResponse> listar(Long clienteId, String estatus, String q) {
+    public List<CotizacionResponse> listar(Long clienteId, String estatus, String q, Long plantaId) {
         Specification<Cotizacion> spec = Specification.where(null);
 
         if (clienteId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("cliente").get("id"), clienteId));
+        }
+        if (plantaId != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("plantaId"), plantaId));
         }
         if (estatus != null && !estatus.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("estatus"), estatus));

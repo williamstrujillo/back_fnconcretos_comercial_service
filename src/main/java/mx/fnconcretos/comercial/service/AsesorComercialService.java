@@ -28,8 +28,11 @@ public class AsesorComercialService {
     private final VisitaObraRepository visitaRepository;
 
     @Transactional(readOnly = true)
-    public List<AsesorResponse> listar() {
-        return asesorRepository.findAll().stream().map(this::toResponse).toList();
+    public List<AsesorResponse> listar(Long plantaId) {
+        List<AsesorComercial> asesores = plantaId != null
+                ? asesorRepository.findByPlantaId(plantaId)
+                : asesorRepository.findAll();
+        return asesores.stream().map(this::toResponse).toList();
     }
 
     @Transactional
