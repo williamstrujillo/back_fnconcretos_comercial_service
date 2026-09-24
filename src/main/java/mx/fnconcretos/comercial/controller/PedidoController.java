@@ -10,6 +10,7 @@ import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
 import mx.fnconcretos.comercial.dto.response.AvancePedidoResponse;
 import mx.fnconcretos.comercial.dto.response.BitacoraEventoResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
+import mx.fnconcretos.comercial.dto.response.WhatsAppEnvioResponse;
 import mx.fnconcretos.comercial.security.JwtPrincipal;
 import mx.fnconcretos.comercial.service.BitacoraService;
 import mx.fnconcretos.comercial.service.PedidoService;
@@ -63,6 +64,16 @@ public class PedidoController {
     public PedidoResponse registrarEntrega(@PathVariable Long id, @Valid @RequestBody RegistrarEntregaRequest request,
                                             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
         return pedidoService.registrarEntrega(id, request, authorization);
+    }
+
+    @PostMapping("/{id}/enviar-whatsapp-seguimiento")
+    @Operation(summary = "Enviar el link de seguimiento del pedido al cliente por WhatsApp",
+            description = "Usa la plantilla aprobada 'pedido_seguimiento' (con boton de rastreo) via la API de "
+                    + "WhatsApp Business -- ya no abre un link wa.me manual. Reutiliza/genera el mismo token "
+                    + "publico que 'Compartir seguimiento'. 409 si el cliente no tiene telefono o si Meta rechaza "
+                    + "el envio (plantilla pendiente de aprobacion, numero no autorizado, etc).")
+    public WhatsAppEnvioResponse enviarWhatsAppSeguimiento(@PathVariable Long id, @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return pedidoService.enviarWhatsAppSeguimiento(id, authorization);
     }
 
     @GetMapping("/{id}/bitacora")
