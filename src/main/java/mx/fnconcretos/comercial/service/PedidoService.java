@@ -4,12 +4,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mx.fnconcretos.comercial.client.AuthClient;
 import mx.fnconcretos.comercial.client.NotificacionClient;
+import mx.fnconcretos.comercial.client.OperacionesClient;
+import mx.fnconcretos.comercial.client.WhatsAppClient;
 import mx.fnconcretos.comercial.dto.request.PedidoUpdateRequest;
 import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
 import mx.fnconcretos.comercial.dto.response.AutorizacionResponse;
 import mx.fnconcretos.comercial.dto.response.AvancePedidoResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoItemResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
+import mx.fnconcretos.comercial.dto.response.WhatsAppEnvioResponse;
 import mx.fnconcretos.comercial.entity.Pedido;
 import mx.fnconcretos.comercial.entity.PedidoAutorizacion;
 import mx.fnconcretos.comercial.entity.PedidoDetalle;
@@ -46,6 +49,8 @@ public class PedidoService {
     private final PedidoAutorizacionRepository autorizacionRepository;
     private final NotificacionClient notificacionClient;
     private final AuthClient authClient;
+    private final WhatsAppClient whatsAppClient;
+    private final OperacionesClient operacionesClient;
     private final BitacoraService bitacoraService;
 
     @Transactional(readOnly = true)
@@ -72,6 +77,29 @@ public class PedidoService {
     @Transactional(readOnly = true)
     public PedidoResponse obtener(Long id) {
         return toResponse(buscarOFallar(id));
+    }
+
+    /**
+     * Envia (o reenvia) por WhatsApp el link de seguimiento del pedido, via la API de WhatsApp
+     * Business (plantilla aprobada "pedido_seguimiento") -- reemplaza el link manual wa.me que
+     * usaba el boton "Compartir seguimiento" del frontend. Disparo manual (el asesor decide el
+     * momento), a diferencia de AutorizacionService.notificarClienteConfirmacion (automatico al
+     * autorizar logistica, plantilla distinta "pedido_confirmado") -- por eso aqui SI se propaga el
+     * error al llamador en vez de solo loguearlo, para que el frontend le muestre al asesor si de
+     * verdad se envio o no.
+     */
+    @Transactional
+    public WhatsAppEnvioResponse enviarWhatsAppSeguimiento(Long id, String bearerToken) {
+        Pedido pedido = buscarOFallar(id);
+        if (pedido.getCliente() == null || pedido.getCliente().getTelefono() == null || pedido.getCliente().getTelefono().isBlank()) {
+            throw new EstadoInvalidoException("El cliente no tiene telefono registrado");
+        }
+
+        String token = operacionesClient.obtenerOCrearTokenSeguimiento(id, bearerToken);
+        whatsAppClient.enviarPlantilla(pedido.getCliente().getTelefono(), "pedido_seguimiento", "es_MX",
+                List.of(pedido.getCliente().getNombre(), pedido.getFolio()), token);
+
+        return WhatsAppEnvioResponse.builder().enviado(true).telefono(pedido.getCliente().getTelefono()).build();
     }
 
     @Transactional
