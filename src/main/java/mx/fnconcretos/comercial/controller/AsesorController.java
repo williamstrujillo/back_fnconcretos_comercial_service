@@ -28,8 +28,8 @@ public class AsesorController {
 
     @GetMapping
     @Operation(summary = "Listar asesores comerciales")
-    public List<AsesorResponse> listar() {
-        return asesorService.listar();
+    public List<AsesorResponse> listar(@RequestParam(required = false) Long plantaId) {
+        return asesorService.listar(plantaId);
     }
 
     @PostMapping
