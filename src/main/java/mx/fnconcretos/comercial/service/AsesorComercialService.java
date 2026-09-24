@@ -117,6 +117,15 @@ public class AsesorComercialService {
         return asesorRepository.findByUsuarioId(usuarioId);
     }
 
+    /** Resuelve el AsesorComercial del usuario autenticado (ver GET /asesores/me) -- mismo criterio
+     * que buscarPorUsuarioId, usado por apps (ej. movil) que solo conocen su propio usuarioId via JWT. */
+    @Transactional(readOnly = true)
+    public AsesorResponse obtenerPropio(Long usuarioId) {
+        return buscarPorUsuarioId(usuarioId)
+                .map(this::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("El usuario " + usuarioId + " no tiene un asesor comercial asociado"));
+    }
+
     private AsesorResponse toResponse(AsesorComercial asesor) {
         return AsesorResponse.builder()
                 .id(asesor.getId())

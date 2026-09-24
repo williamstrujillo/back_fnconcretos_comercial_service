@@ -9,9 +9,11 @@ import mx.fnconcretos.comercial.dto.request.AsesorRequest;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
 import mx.fnconcretos.comercial.dto.response.AsesorResponse;
 import mx.fnconcretos.comercial.dto.response.DesempenoAsesorResponse;
+import mx.fnconcretos.comercial.security.JwtPrincipal;
 import mx.fnconcretos.comercial.service.AsesorComercialService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -30,6 +32,12 @@ public class AsesorController {
     @Operation(summary = "Listar asesores comerciales")
     public List<AsesorResponse> listar(@RequestParam(required = false) Long plantaId) {
         return asesorService.listar(plantaId);
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "Resuelve el asesor comercial del usuario autenticado (404 si el usuario no tiene uno asociado)")
+    public AsesorResponse propio(@AuthenticationPrincipal JwtPrincipal principal) {
+        return asesorService.obtenerPropio(principal.usuarioId());
     }
 
     @PostMapping
