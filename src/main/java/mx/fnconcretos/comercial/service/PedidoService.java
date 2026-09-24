@@ -54,7 +54,7 @@ public class PedidoService {
     private final BitacoraService bitacoraService;
 
     @Transactional(readOnly = true)
-    public List<PedidoResponse> listar(Long clienteId, String estatusGeneral, String q, Long plantaId) {
+    public List<PedidoResponse> listar(Long clienteId, String estatusGeneral, String q, Long plantaId, Long asesorId) {
         Specification<Pedido> spec = Specification.where(null);
 
         if (clienteId != null) {
@@ -62,6 +62,9 @@ public class PedidoService {
         }
         if (plantaId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("plantaId"), plantaId));
+        }
+        if (asesorId != null) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("asesor").get("id"), asesorId));
         }
         if (estatusGeneral != null && !estatusGeneral.isBlank()) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("estatusGeneral"), estatusGeneral));

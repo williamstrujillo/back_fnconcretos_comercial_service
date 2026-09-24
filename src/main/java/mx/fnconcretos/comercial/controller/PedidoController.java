@@ -31,12 +31,13 @@ public class PedidoController {
     private final BitacoraService bitacoraService;
 
     @GetMapping
-    @Operation(summary = "Buscar pedidos por cliente, planta, estatus general o folio (q, coincidencia parcial)")
+    @Operation(summary = "Buscar pedidos por cliente, planta, asesor, estatus general o folio (q, coincidencia parcial)")
     public List<PedidoResponse> listar(@RequestParam(required = false) Long clienteId,
                                         @RequestParam(required = false) String estatusGeneral,
                                         @RequestParam(required = false) String q,
-                                        @RequestParam(required = false) Long plantaId) {
-        return pedidoService.listar(clienteId, estatusGeneral, q, plantaId);
+                                        @RequestParam(required = false) Long plantaId,
+                                        @RequestParam(required = false) Long asesorId) {
+        return pedidoService.listar(clienteId, estatusGeneral, q, plantaId, asesorId);
     }
 
     @GetMapping("/{id}")
