@@ -19,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -146,7 +148,15 @@ public class ClienteService {
         return toResponse(clienteRepository.save(cliente));
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * OJO: a proposito SIN @Transactional -- este metodo hace una llamada HTTP saliente bloqueante
+     * hacia finanzas-service (que a su vez llama de vuelta a este servicio). Si se envuelve en una
+     * transaccion, Spring retiene una conexion de HikariCP reservada durante TODA esa llamada de
+     * red; con varias peticiones concurrentes (ej. la pantalla de estado de cuenta de clientes, que
+     * antes pedia una por cliente en paralelo) el pool se agota y las peticiones truenan con 500
+     * antes de llegar siquiera al try/catch de abajo. buscarOFallar() ya corre en su propia
+     * transaccion implicita de Spring Data, no necesita una envolvente.
+     */
     public EstadoCuentaResponse estadoCuenta(Long id, String bearerToken) {
         buscarOFallar(id);
         try {
@@ -166,6 +176,48 @@ public class ClienteService {
                     .disponible(false)
                     .mensaje("No se pudo consultar el estado de cuenta en este momento")
                     .build();
+        }
+    }
+
+    /**
+     * Estado de cuenta de varios clientes en UNA sola llamada a finanzas-service (en vez de que el
+     * frontend dispare N peticiones en paralelo, una por cliente -- eso agotaba el pool de conexiones
+     * de ambos servicios bajo carga, ver la correccion de @Transactional arriba en este mismo commit).
+     */
+    public List<EstadoCuentaResponse> estadoCuentaBatch(List<Long> ids, String bearerToken) {
+        try {
+            List<FinanzasClient.EstadoCuentaClienteInfo> infos = finanzasClient.obtenerEstadoCuentaBatch(ids, bearerToken);
+            Map<Long, FinanzasClient.EstadoCuentaClienteInfo> porId = infos.stream()
+                    .collect(Collectors.toMap(FinanzasClient.EstadoCuentaClienteInfo::getClienteId, i -> i));
+            return ids.stream()
+                    .map(id -> {
+                        FinanzasClient.EstadoCuentaClienteInfo info = porId.get(id);
+                        if (info == null) {
+                            return EstadoCuentaResponse.builder()
+                                    .clienteId(id)
+                                    .disponible(false)
+                                    .mensaje("No se pudo consultar el estado de cuenta en este momento")
+                                    .build();
+                        }
+                        return EstadoCuentaResponse.builder()
+                                .clienteId(id)
+                                .disponible(info.isDisponible())
+                                .saldoActual(info.getSaldoActual())
+                                .adeudoVencido(info.getAdeudoVencido())
+                                .anticiposDisponibles(info.getAnticiposDisponibles())
+                                .moroso(info.isMoroso())
+                                .build();
+                    })
+                    .toList();
+        } catch (Exception e) {
+            log.warn("No se pudo obtener el estado de cuenta batch de los clientes {} desde finanzas-service: {}", ids, e.getMessage());
+            return ids.stream()
+                    .map(id -> EstadoCuentaResponse.builder()
+                            .clienteId(id)
+                            .disponible(false)
+                            .mensaje("No se pudo consultar el estado de cuenta en este momento")
+                            .build())
+                    .toList();
         }
     }
 

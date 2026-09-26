@@ -63,4 +63,11 @@ public class ClienteController {
     public EstadoCuentaResponse estadoCuenta(@PathVariable Long id, @RequestHeader(HttpHeaders.AUTHORIZATION) String bearerToken) {
         return clienteService.estadoCuenta(id, bearerToken);
     }
+
+    @GetMapping("/estado-cuenta/batch")
+    @Operation(summary = "Estado de cuenta de varios clientes en una sola llamada (evita disparar N peticiones en paralelo desde el frontend)")
+    public List<EstadoCuentaResponse> estadoCuentaBatch(@RequestParam List<Long> ids,
+                                                          @RequestHeader(HttpHeaders.AUTHORIZATION) String bearerToken) {
+        return clienteService.estadoCuentaBatch(ids, bearerToken);
+    }
 }
