@@ -76,6 +76,7 @@ public class ClienteService {
                 .diasCredito(request.getDiasCredito() != null ? request.getDiasCredito() : 0)
                 .origenCaptacion(origenCaptacion)
                 .porcentajeComision(resolverPorcentajeComision(origenCaptacion, request.getPorcentajeComision()))
+                .modalidadFacturacion(resolverModalidadFacturacion(request.getModalidadFacturacion()))
                 .build();
 
         return toResponse(clienteRepository.save(cliente));
@@ -119,6 +120,7 @@ public class ClienteService {
         if (request.getDiasCredito() != null) cliente.setDiasCredito(request.getDiasCredito());
         if (request.getOrigenCaptacion() != null) cliente.setOrigenCaptacion(request.getOrigenCaptacion());
         cliente.setPorcentajeComision(resolverPorcentajeComision(cliente.getOrigenCaptacion(), request.getPorcentajeComision()));
+        if (request.getModalidadFacturacion() != null) cliente.setModalidadFacturacion(resolverModalidadFacturacion(request.getModalidadFacturacion()));
 
         return toResponse(clienteRepository.save(cliente));
     }
@@ -139,6 +141,19 @@ public class ClienteService {
             return porcentaje;
         }
         throw new IllegalArgumentException("origenCaptacion debe ser 'asignado' o 'prospectado'");
+    }
+
+    /** por_pedido: una prefactura al completarse todo el pedido. por_remision: una prefactura por
+     * cada remision firmada (facturacion parcial). Ver PrefacturaService (finanzas-service),
+     * procesarEventoPedidoCompletado/procesarEventoRemisionFirmada. */
+    private String resolverModalidadFacturacion(String modalidadSolicitada) {
+        if (modalidadSolicitada == null) {
+            return "por_pedido";
+        }
+        if (!"por_pedido".equals(modalidadSolicitada) && !"por_remision".equals(modalidadSolicitada)) {
+            throw new IllegalArgumentException("modalidadFacturacion debe ser 'por_pedido' o 'por_remision'");
+        }
+        return modalidadSolicitada;
     }
 
     @Transactional
@@ -249,6 +264,7 @@ public class ClienteService {
                 .diasCredito(cliente.getDiasCredito())
                 .origenCaptacion(cliente.getOrigenCaptacion())
                 .porcentajeComision(cliente.getPorcentajeComision())
+                .modalidadFacturacion(cliente.getModalidadFacturacion())
                 .estatus(cliente.getEstatus())
                 .createdAt(cliente.getCreatedAt())
                 .build();

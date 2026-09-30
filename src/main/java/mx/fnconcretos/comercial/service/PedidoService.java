@@ -3,6 +3,7 @@ package mx.fnconcretos.comercial.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mx.fnconcretos.comercial.client.AuthClient;
+import mx.fnconcretos.comercial.client.FinanzasClient;
 import mx.fnconcretos.comercial.client.NotificacionClient;
 import mx.fnconcretos.comercial.client.OperacionesClient;
 import mx.fnconcretos.comercial.client.WhatsAppClient;
@@ -51,6 +52,7 @@ public class PedidoService {
     private final AuthClient authClient;
     private final WhatsAppClient whatsAppClient;
     private final OperacionesClient operacionesClient;
+    private final FinanzasClient finanzasClient;
     private final BitacoraService bitacoraService;
 
     @Transactional(readOnly = true)
@@ -171,6 +173,7 @@ public class PedidoService {
         Pedido guardado = pedidoRepository.save(pedido);
         if ("completo".equals(guardado.getEstatusGeneral())) {
             notificarAsesor(guardado, bearerToken);
+            notificarFinanzasPedidoCompletado(guardado, bearerToken);
         }
 
         String descripcionEntrega = "Se registro una entrega de " + request.getMetrosEntregados() + " m3"
@@ -189,6 +192,18 @@ public class PedidoService {
                     "El pedido " + pedido.getFolio() + " ya se entrego por completo.", "pedido", pedido.getId(), bearerToken);
         } catch (Exception e) {
             log.warn("No se pudo notificar al asesor del pedido {}: {}", pedido.getId(), e.getMessage());
+        }
+    }
+
+    /** Genera la prefactura automatica en finanzas-service cuando el cliente tiene
+     * modalidadFacturacion=por_pedido -- finanzas-service resuelve esa preferencia por su cuenta
+     * (ver PrefacturaService.procesarEventoPedidoCompletado), aqui solo se avisa del evento. Una
+     * falla nunca bloquea que el pedido quede marcado como completo. */
+    private void notificarFinanzasPedidoCompletado(Pedido pedido, String bearerToken) {
+        try {
+            finanzasClient.notificarPedidoCompletado(pedido.getId(), bearerToken);
+        } catch (Exception e) {
+            log.warn("No se pudo notificar a finanzas-service el pedido completado {}: {}", pedido.getId(), e.getMessage());
         }
     }
 

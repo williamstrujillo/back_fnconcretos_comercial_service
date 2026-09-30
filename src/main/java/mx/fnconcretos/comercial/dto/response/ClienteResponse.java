@@ -28,6 +28,7 @@ public class ClienteResponse {
     private Integer diasCredito;
     private String origenCaptacion;
     private BigDecimal porcentajeComision;
+    private String modalidadFacturacion;
     private String estatus;
     private LocalDateTime createdAt;
 }

@@ -47,6 +47,21 @@ public class FinanzasClient {
         return infos != null ? infos : List.of();
     }
 
+    /**
+     * Notifica que un pedido llego a estatusGeneral=completo -- finanzas-service decide internamente
+     * si genera la prefactura automatica (solo si el cliente tiene modalidadFacturacion=por_pedido;
+     * si no, no hace nada). bearerToken debe incluir "Bearer ". Llamada desde PedidoService al mismo
+     * tiempo que se notifica al asesor -- una falla aqui nunca bloquea que el pedido se marque como
+     * completo (ver PedidoService.notificarFinanzasPedidoCompletado).
+     */
+    public void notificarPedidoCompletado(Long pedidoId, String bearerToken) {
+        restClient.post()
+                .uri("/prefacturas/eventos/pedido-completado/{pedidoId}", pedidoId)
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .toBodilessEntity();
+    }
+
     @Data
     public static class EstadoCuentaClienteInfo {
         private Long clienteId;

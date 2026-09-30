@@ -57,6 +57,14 @@ public class Cliente {
     @Builder.Default
     private Boolean requiereFacturaDefault = false;
 
+    /** por_pedido (default, una prefactura al completarse todo el pedido), por_remision (una
+     * prefactura por cada remision firmada, facturacion parcial) -- preferencia real del cliente,
+     * usada tanto para default/filtro en el modal manual de "Nueva prefactura" (finanzas-service)
+     * como para la generacion automatica al completarse el pedido / firmarse una remision. */
+    @Column(name = "modalidad_facturacion", nullable = false, length = 20)
+    @Builder.Default
+    private String modalidadFacturacion = "por_pedido";
+
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "asesor_asignado_id")
     private AsesorComercial asesorAsignado;

@@ -35,4 +35,7 @@ public class ClienteRequest {
 
     /** % de comision antes de IVA; si se omite: 1.00 si asignado, o el que ya tuviera si se esta actualizando */
     private BigDecimal porcentajeComision;
+
+    /** por_pedido (default), por_remision -- ver Cliente.modalidadFacturacion */
+    private String modalidadFacturacion;
 }
