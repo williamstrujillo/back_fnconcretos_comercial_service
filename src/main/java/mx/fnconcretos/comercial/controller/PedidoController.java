@@ -17,7 +17,9 @@ import mx.fnconcretos.comercial.service.PedidoService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -31,13 +33,16 @@ public class PedidoController {
     private final BitacoraService bitacoraService;
 
     @GetMapping
-    @Operation(summary = "Buscar pedidos por cliente, planta, asesor, estatus general o folio (q, coincidencia parcial)")
+    @Operation(summary = "Buscar pedidos por cliente, planta, asesor, estatus general o folio (q, coincidencia parcial). "
+            + "desde/hasta filtran por fechaProgramada (para el informe de pedidos y ventas por periodo de Direccion).")
     public List<PedidoResponse> listar(@RequestParam(required = false) Long clienteId,
                                         @RequestParam(required = false) String estatusGeneral,
                                         @RequestParam(required = false) String q,
                                         @RequestParam(required = false) Long plantaId,
-                                        @RequestParam(required = false) Long asesorId) {
-        return pedidoService.listar(clienteId, estatusGeneral, q, plantaId, asesorId);
+                                        @RequestParam(required = false) Long asesorId,
+                                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+                                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+        return pedidoService.listar(clienteId, estatusGeneral, q, plantaId, asesorId, desde, hasta);
     }
 
     @GetMapping("/{id}")
