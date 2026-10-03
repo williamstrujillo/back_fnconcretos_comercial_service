@@ -57,6 +57,11 @@ public class PedidoService {
 
     @Transactional(readOnly = true)
     public List<PedidoResponse> listar(Long clienteId, String estatusGeneral, String q, Long plantaId, Long asesorId) {
+        return listar(clienteId, estatusGeneral, q, plantaId, asesorId, null, null);
+    }
+
+    public List<PedidoResponse> listar(Long clienteId, String estatusGeneral, String q, Long plantaId, Long asesorId,
+                                        LocalDate desde, LocalDate hasta) {
         Specification<Pedido> spec = Specification.where(null);
 
         if (clienteId != null) {
@@ -74,6 +79,12 @@ public class PedidoService {
         if (q != null && !q.isBlank()) {
             String like = "%" + q.toLowerCase() + "%";
             spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("folio")), like));
+        }
+        if (desde != null) {
+            spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("fechaProgramada"), desde));
+        }
+        if (hasta != null) {
+            spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("fechaProgramada"), hasta));
         }
 
         return pedidoRepository.findAll(spec).stream().map(this::toResponse).toList();
