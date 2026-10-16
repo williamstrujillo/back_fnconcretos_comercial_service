@@ -88,6 +88,18 @@ public class Pedido {
     @Column(name = "distancia_km", precision = 8, scale = 2)
     private BigDecimal distanciaKm;
 
+    /** Copiado de Cotizacion.zonaPrecio al convertir -- queda congelado, nunca se recalcula en el
+     * pedido (la cotizacion de origen ya no se puede editar una vez convertida, ver
+     * CotizacionService.convertirAPedido). */
+    @Column(name = "zona_precio", nullable = false, length = 20)
+    @Builder.Default
+    private String zonaPrecio = "normal";
+
+    /** Copiado de Cotizacion.porcentajeRecargoForaneo al convertir. */
+    @Column(name = "porcentaje_recargo_foraneo", nullable = false, precision = 5, scale = 2)
+    @Builder.Default
+    private BigDecimal porcentajeRecargoForaneo = BigDecimal.ZERO;
+
     /** liquidado, anticipo, credito, liquidar_obra */
     @Column(name = "condicion_pago", nullable = false, length = 20)
     @Builder.Default

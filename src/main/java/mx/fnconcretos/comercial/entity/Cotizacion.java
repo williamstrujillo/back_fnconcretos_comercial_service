@@ -82,6 +82,22 @@ public class Cotizacion {
     @Column(name = "distancia_km", precision = 8, scale = 2)
     private BigDecimal distanciaKm;
 
+    /** normal, foraneo_1, foraneo_2 -- determinada por distanciaKm al calcular las lineas (ver
+     * CotizacionService.resolverZonaPrecio). "normal" si distanciaKm es null (no se pudo calcular
+     * -- nunca se penaliza al cliente por una limitacion del sistema, ver Javadoc del metodo). Se
+     * calcula y persiste en cada crear()/actualizar(); no se recalcula al leer, asi que una
+     * cotizacion ya guardada no cambia de zona aunque los umbrales/porcentajes globales cambien
+     * despues (ver tambien distanciaKm, que sigue el mismo criterio de "snapshot al guardar"). */
+    @Column(name = "zona_precio", nullable = false, length = 20)
+    @Builder.Default
+    private String zonaPrecio = "normal";
+
+    /** % de recargo foraneo realmente aplicado (snapshot de negocio.precio-foraneo.porcentaje-1/2
+     * al momento de calcular) -- 0 si zonaPrecio=normal. Solo afecta lineas tipoLinea=producto. */
+    @Column(name = "porcentaje_recargo_foraneo", nullable = false, precision = 5, scale = 2)
+    @Builder.Default
+    private BigDecimal porcentajeRecargoForaneo = BigDecimal.ZERO;
+
     /** Metodo de pago real: efectivo, transferencia, tarjeta_debito, tarjeta_credito (mismo catalogo
      * que Pago.metodoPago en finanzas-service). El tope de descuento ya NO depende de este campo --
      * ver requiereFactura y CotizacionService.validarDescuento. */

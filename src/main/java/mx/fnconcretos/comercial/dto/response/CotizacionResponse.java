@@ -1,5 +1,6 @@
 package mx.fnconcretos.comercial.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -36,6 +37,13 @@ public class CotizacionResponse {
     private LocalTime horarioEntrega;
     private Long elementoConstructivoId;
     private BigDecimal distanciaKm;
+    @Schema(description = "normal | foraneo_1 | foraneo_2 -- determinada por distanciaKm al guardar. "
+            + "\"normal\" tambien cuando distanciaKm es null (no se pudo calcular la ruta); en ese caso "
+            + "nunca se aplica recargo, para no penalizar al cliente por una limitacion del sistema.")
+    private String zonaPrecio;
+    @Schema(description = "% de recargo foraneo realmente aplicado (0 si zonaPrecio=normal). Snapshot al "
+            + "momento de calcular -- no cambia si los porcentajes/umbrales globales cambian despues.")
+    private BigDecimal porcentajeRecargoForaneo;
     private String formaPago;
     private Boolean requiereFactura;
     private BigDecimal porcentajeDescuento;

@@ -44,6 +44,16 @@ public class CotizacionDetalle {
     @Column(name = "volumen_m3", nullable = false, precision = 10, scale = 2)
     private BigDecimal volumenM3;
 
+    /** Precio unitario de catalogo, ANTES del recargo foraneo -- igual a precioUnitario para
+     * lineas que no son tipoLinea=producto (a esas nunca se les aplica recargo foraneo). */
+    @Column(name = "precio_unitario_base", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal precioUnitarioBase = BigDecimal.ZERO;
+
+    /** Precio unitario YA con el recargo foraneo aplicado (si tipoLinea=producto y la zona no es
+     * "normal"), pero SIN el descuento negociado -- mismo criterio que antes de que existiera el
+     * recargo foraneo (precioTotal es quien aplica el descuento, ver
+     * CotizacionService.precioConDescuento). */
     @Column(name = "precio_unitario", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal precioUnitario = BigDecimal.ZERO;
