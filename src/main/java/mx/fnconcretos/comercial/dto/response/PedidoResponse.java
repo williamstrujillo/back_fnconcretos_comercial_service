@@ -1,5 +1,6 @@
 package mx.fnconcretos.comercial.dto.response;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -41,6 +42,11 @@ public class PedidoResponse {
     private Long elementoConstructivoId;
     /** Distancia real por carretera obra<->planta en KM (copiada de la cotizacion de origen). */
     private BigDecimal distanciaKm;
+    @Schema(description = "normal | foraneo_1 | foraneo_2 -- copiada de la cotizacion de origen al "
+            + "convertir, congelada (el pedido nunca recalcula zona/recargo por su cuenta).")
+    private String zonaPrecio;
+    @Schema(description = "% de recargo foraneo aplicado, copiado de la cotizacion de origen al convertir.")
+    private BigDecimal porcentajeRecargoForaneo;
     private String condicionPago;
     private Integer diasCredito;
     /** Metodo con el que el cliente va a pagar (efectivo, transferencia, tarjeta_debito,

@@ -52,6 +52,11 @@ public class PedidoDetalle {
     @Builder.Default
     private BigDecimal volumenPendienteM3 = BigDecimal.ZERO;
 
+    /** Copiado de CotizacionDetalle.precioUnitarioBase al convertir. */
+    @Column(name = "precio_unitario_base", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal precioUnitarioBase = BigDecimal.ZERO;
+
     @Column(name = "precio_unitario", nullable = false, precision = 14, scale = 2)
     @Builder.Default
     private BigDecimal precioUnitario = BigDecimal.ZERO;
