@@ -165,7 +165,17 @@ public class CotizacionCompartidaService {
                 .bomba("bomba".equals(cotizacion.getTipoServicio()) ? "Sí" : null)
                 .autorizo(null)
                 .distanciaKm(cotizacion.getDistanciaKm() != null ? cotizacion.getDistanciaKm() + " km" : null)
+                .tarifa(etiquetaTarifa(cotizacion.getZonaPrecio(), cotizacion.getPorcentajeRecargoForaneo()))
                 .build();
+    }
+
+    /** "Foráneo 1 (+22%)" / "Foráneo 2 (+44%)" -- null si zonaPrecio=normal (precio de catalogo,
+     * sin recargo, no hace falta aclarar nada en el documento). */
+    private String etiquetaTarifa(String zonaPrecio, java.math.BigDecimal porcentajeRecargoForaneo) {
+        if (zonaPrecio == null || "normal".equals(zonaPrecio)) return null;
+        String etiquetaZona = "foraneo_1".equals(zonaPrecio) ? "Foráneo 1" : "foraneo_2".equals(zonaPrecio) ? "Foráneo 2" : zonaPrecio;
+        String porcentaje = porcentajeRecargoForaneo.stripTrailingZeros().toPlainString();
+        return etiquetaZona + " (+" + porcentaje + "%)";
     }
 
     private String resolverNombreElementoConstructivo(Long elementoConstructivoId, String bearerToken) {

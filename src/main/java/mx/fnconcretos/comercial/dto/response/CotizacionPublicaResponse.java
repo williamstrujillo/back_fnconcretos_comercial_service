@@ -68,6 +68,10 @@ public class CotizacionPublicaResponse {
         private String bomba;
         private String autorizo;
         private String distanciaKm;
+        /** Ej. "Foráneo 1 (+22%)" -- null si zonaPrecio=normal (no se muestra nada en ese caso, es
+         * el precio de catalogo sin recargo). Ya formateado, mismo criterio que distanciaKm/
+         * fechaHoraServicio en este snapshot: el frontend solo lo pinta, no lo reconstruye. */
+        private String tarifa;
     }
 
     @Data
