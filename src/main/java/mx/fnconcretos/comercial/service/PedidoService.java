@@ -296,6 +296,7 @@ public class PedidoService {
                 .cotizacionId(pedido.getCotizacion() != null ? pedido.getCotizacion().getId() : null)
                 .clienteId(pedido.getCliente().getId())
                 .clienteNombre(pedido.getCliente().getNombre())
+                .clienteTelefono(pedido.getCliente().getTelefono())
                 .obraId(pedido.getObra() != null ? pedido.getObra().getId() : null)
                 .obraNombre(pedido.getObra() != null ? pedido.getObra().getNombre() : null)
                 .plantaId(pedido.getPlantaId())

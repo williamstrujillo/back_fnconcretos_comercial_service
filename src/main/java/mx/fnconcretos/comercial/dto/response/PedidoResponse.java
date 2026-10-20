@@ -21,6 +21,9 @@ public class PedidoResponse {
     private Long cotizacionId;
     private Long clienteId;
     private String clienteNombre;
+    /** Para que operaciones-service pueda mandar el WhatsApp de seguimiento al salir de planta sin
+     * tener que resolver el cliente por separado (ver RemisionService.avanzarHito). */
+    private String clienteTelefono;
     private Long obraId;
     private String obraNombre;
     private Long plantaId;
