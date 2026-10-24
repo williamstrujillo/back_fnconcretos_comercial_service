@@ -65,4 +65,6 @@ public class PedidoResponse {
     private String creadoPorUsuario;
     private String actualizadoPorUsuario;
     private LocalDateTime actualizadoEn;
+    /** Copiado tal cual de la cotizacion de origen al convertir -- no se vuelve a resolver contra el catalogo. */
+    private CondicionesSnapshotResponse condiciones;
 }

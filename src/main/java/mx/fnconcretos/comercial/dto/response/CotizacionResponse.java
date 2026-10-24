@@ -60,4 +60,5 @@ public class CotizacionResponse {
     private String creadoPorUsuario;
     private String actualizadoPorUsuario;
     private LocalDateTime actualizadoEn;
+    private CondicionesSnapshotResponse condiciones;
 }

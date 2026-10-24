@@ -4,8 +4,10 @@ import lombok.Data;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.HttpClientErrorException;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * Cliente hacia catalogo-service. No hay descubrimiento de servicios en el
@@ -61,6 +63,54 @@ public class CatalogoClient {
                 .header(HttpHeaders.AUTHORIZATION, bearerToken)
                 .retrieve()
                 .body(ElementoConstructivoInfo.class);
+    }
+
+    /** 404 -> null (tipoCondicionId invalido, lo decide el caller). bearerToken debe incluir el prefijo "Bearer ". */
+    public TipoCondicionInfo obtenerTipoCondicion(Long tipoCondicionId, String bearerToken) {
+        try {
+            return restClient.get()
+                    .uri("/tipos-condicion/{id}", tipoCondicionId)
+                    .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                    .retrieve()
+                    .body(TipoCondicionInfo.class);
+        } catch (HttpClientErrorException.NotFound e) {
+            return null;
+        }
+    }
+
+    /** Tipos de condicion activos -- usado para resolver el predeterminado cuando la cotizacion no
+     * especifica tipoCondicionId. bearerToken debe incluir el prefijo "Bearer ". */
+    public List<TipoCondicionInfo> listarTiposCondicionActivos(String bearerToken) {
+        TipoCondicionInfo[] respuesta = restClient.get()
+                .uri("/tipos-condicion?activos=true")
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .retrieve()
+                .body(TipoCondicionInfo[].class);
+        return respuesta != null ? List.of(respuesta) : List.of();
+    }
+
+    @Data
+    public static class TipoCondicionInfo {
+        private Long id;
+        private String nombre;
+        private String aviso;
+        private Boolean numerarApartados;
+        private Boolean activo;
+        private Boolean predeterminado;
+        private List<ApartadoInfo> apartados;
+    }
+
+    @Data
+    public static class ApartadoInfo {
+        private String titulo;
+        private String estilo;
+        private List<CondicionInfo> condiciones;
+    }
+
+    @Data
+    public static class CondicionInfo {
+        private String texto;
+        private Boolean seleccionada;
     }
 
     @Data

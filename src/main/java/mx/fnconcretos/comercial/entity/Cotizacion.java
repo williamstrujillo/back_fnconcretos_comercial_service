@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -154,6 +155,19 @@ public class Cotizacion {
 
     @Column(name = "observaciones", length = 250)
     private String observaciones;
+
+    /** Tipo de condicion comercial en catalogo-service; solo el id. Null si nunca se resolvio uno
+     * (no se pidio explicitamente y tampoco hay ningun tipo predeterminado activo en catalogo). */
+    @Column(name = "tipo_condicion_id")
+    private Long tipoCondicionId;
+
+    /** Snapshot JSON (CondicionesSnapshotResponse) de lo que se imprime: nombre/aviso del tipo y sus
+     * apartados con SOLO las condiciones seleccionadas, en orden -- congelado al crear/actualizar
+     * para que editar el catalogo despues no cambie cotizaciones ya guardadas/enviadas. Null si
+     * tipoCondicionId es null. */
+    @Lob
+    @Column(name = "condiciones_snapshot", columnDefinition = "LONGTEXT")
+    private String condicionesSnapshot;
 
     @Column(name = "enviada_whatsapp", nullable = false)
     @Builder.Default

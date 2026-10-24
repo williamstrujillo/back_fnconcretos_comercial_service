@@ -1,6 +1,8 @@
 package mx.fnconcretos.comercial.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import mx.fnconcretos.comercial.client.CatalogoClient;
 import mx.fnconcretos.comercial.client.GoogleMapsClient;
 import mx.fnconcretos.comercial.client.WhatsAppClient;
@@ -8,6 +10,7 @@ import mx.fnconcretos.comercial.dto.request.CotizacionItemRequest;
 import mx.fnconcretos.comercial.dto.request.CotizacionRequest;
 import mx.fnconcretos.comercial.dto.request.ConvertirPedidoRequest;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
+import mx.fnconcretos.comercial.dto.response.CondicionesSnapshotResponse;
 import mx.fnconcretos.comercial.dto.response.CotizacionItemResponse;
 import mx.fnconcretos.comercial.dto.response.CotizacionResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoItemResponse;
@@ -42,6 +45,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CotizacionService {
@@ -59,6 +63,7 @@ public class CotizacionService {
     private final WhatsAppClient whatsAppClient;
     private final CotizacionCompartidaService cotizacionCompartidaService;
     private final BitacoraService bitacoraService;
+    private final ObjectMapper objectMapper;
 
     @Value("${negocio.descuento.min-sin-factura}")
     private BigDecimal descuentoMinSinFactura;
@@ -126,6 +131,7 @@ public class CotizacionService {
         boolean requiereFactura = Boolean.TRUE.equals(request.getRequiereFactura());
         BigDecimal porcentajeIvaAplicado = requiereFactura ? porcentajeIvaDePlanta(tarifas) : null;
         BigDecimal iva = calcularIva(subtotal, porcentajeIvaAplicado);
+        CondicionesResueltas condiciones = resolverCondiciones(request.getTipoCondicionId(), bearerToken);
 
         Cotizacion cotizacion = Cotizacion.builder()
                 .folio(generarFolio())
@@ -151,6 +157,8 @@ public class CotizacionService {
                 .porcentajeIva(porcentajeIvaAplicado)
                 .precioTotal(subtotal.add(iva))
                 .observaciones(request.getObservaciones())
+                .tipoCondicionId(condiciones.tipoCondicionId())
+                .condicionesSnapshot(condiciones.snapshotJson())
                 .creadoPorUsuario(principal != null ? principal.user() : null)
                 .actualizadoPorUsuario(principal != null ? principal.user() : null)
                 .actualizadoEn(LocalDateTime.now())
@@ -169,6 +177,13 @@ public class CotizacionService {
     @Transactional(readOnly = true)
     public CotizacionResponse obtener(Long id) {
         return toResponse(buscarOFallar(id));
+    }
+
+    /** Usado por catalogo-service antes de borrar un tipo de condicion (unico caso donde ese
+     * servicio llama hacia comercial-service, al reves de lo normal). */
+    @Transactional(readOnly = true)
+    public boolean usaTipoCondicion(Long tipoCondicionId) {
+        return cotizacionRepository.existsByTipoCondicionId(tipoCondicionId);
     }
 
     /**
@@ -234,6 +249,7 @@ public class CotizacionService {
         boolean requiereFactura = request.getRequiereFactura() != null ? request.getRequiereFactura() : Boolean.TRUE.equals(cotizacion.getRequiereFactura());
         BigDecimal porcentajeIvaAplicado = requiereFactura ? porcentajeIvaDePlanta(tarifas) : null;
         BigDecimal iva = calcularIva(subtotal, porcentajeIvaAplicado);
+        CondicionesResueltas condiciones = resolverCondiciones(request.getTipoCondicionId(), bearerToken);
 
         cotizacion.setCliente(clienteService.buscarOFallar(request.getClienteId()));
         cotizacion.setObra(obraNueva);
@@ -257,6 +273,8 @@ public class CotizacionService {
         cotizacion.setPorcentajeIva(porcentajeIvaAplicado);
         cotizacion.setPrecioTotal(subtotal.add(iva));
         cotizacion.setObservaciones(request.getObservaciones());
+        cotizacion.setTipoCondicionId(condiciones.tipoCondicionId());
+        cotizacion.setCondicionesSnapshot(condiciones.snapshotJson());
         cotizacion.setActualizadoPorUsuario(principal != null ? principal.user() : null);
         cotizacion.setActualizadoEn(LocalDateTime.now());
 
@@ -316,6 +334,8 @@ public class CotizacionService {
                 .precioUnitario(origen.getPrecioUnitario())
                 .precioTotal(origen.getPrecioTotal())
                 .observaciones(origen.getObservaciones())
+                .tipoCondicionId(origen.getTipoCondicionId())
+                .condicionesSnapshot(origen.getCondicionesSnapshot())
                 .cotizacionOrigen(origen)
                 .creadoPorUsuario(usuario)
                 .actualizadoPorUsuario(usuario)
@@ -376,6 +396,7 @@ public class CotizacionService {
                 .porcentajeRecargoForaneo(cotizacion.getPorcentajeRecargoForaneo())
                 .condicionPago(request.getCondicionPago())
                 .diasCredito(request.getDiasCredito())
+                .condicionesSnapshot(cotizacion.getCondicionesSnapshot())
                 .creadoPorUsuario(usuario)
                 .actualizadoPorUsuario(usuario)
                 .actualizadoEn(LocalDateTime.now())
@@ -737,6 +758,7 @@ public class CotizacionService {
                 .actualizadoEn(cotizacion.getActualizadoEn())
                 .productos(cotizacionDetalleRepository.findByCotizacionId(cotizacion.getId()).stream()
                         .map(this::toItemResponse).toList())
+                .condiciones(parseCondiciones(cotizacion.getCondicionesSnapshot()))
                 .build();
     }
 
@@ -793,6 +815,7 @@ public class CotizacionService {
                 .creadoPorUsuario(pedido.getCreadoPorUsuario())
                 .actualizadoPorUsuario(pedido.getActualizadoPorUsuario())
                 .actualizadoEn(pedido.getActualizadoEn())
+                .condiciones(parseCondiciones(pedido.getCondicionesSnapshot()))
                 .productos(lineas.stream().map(linea -> PedidoItemResponse.builder()
                         .id(linea.getId())
                         .tipoLinea(linea.getTipoLinea())
@@ -806,5 +829,70 @@ public class CotizacionService {
                         .descripcion(linea.getDescripcion())
                         .build()).toList())
                 .build();
+    }
+
+    private record CondicionesResueltas(Long tipoCondicionId, String snapshotJson) {
+        private static final CondicionesResueltas VACIAS = new CondicionesResueltas(null, null);
+    }
+
+    /**
+     * Resuelve el tipo de condicion a usar (el pedido explicitamente, o el predeterminado activo si
+     * no se pidio ninguno) y arma el snapshot JSON que se congela en la cotizacion -- solo con las
+     * condiciones SELECCIONADAS, en orden. Si no se pidio tipoCondicionId y tampoco hay ningun tipo
+     * predeterminado activo en catalogo-service, la cotizacion queda sin hoja de condiciones (nunca
+     * se bloquea el guardado por esto). bearerToken debe incluir el prefijo "Bearer ".
+     */
+    private CondicionesResueltas resolverCondiciones(Long tipoCondicionIdSolicitado, String bearerToken) {
+        CatalogoClient.TipoCondicionInfo tipo;
+        if (tipoCondicionIdSolicitado != null) {
+            tipo = catalogoClient.obtenerTipoCondicion(tipoCondicionIdSolicitado, bearerToken);
+            if (tipo == null) {
+                throw new IllegalArgumentException("tipoCondicionId invalido: " + tipoCondicionIdSolicitado);
+            }
+            if (!Boolean.TRUE.equals(tipo.getActivo())) {
+                throw new IllegalArgumentException("El tipo de condición '" + tipo.getNombre() + "' no está activo");
+            }
+        } else {
+            tipo = catalogoClient.listarTiposCondicionActivos(bearerToken).stream()
+                    .filter(t -> Boolean.TRUE.equals(t.getPredeterminado()))
+                    .findFirst()
+                    .orElse(null);
+            if (tipo == null) {
+                return CondicionesResueltas.VACIAS;
+            }
+        }
+
+        CondicionesSnapshotResponse snapshot = CondicionesSnapshotResponse.builder()
+                .tipoCondicionId(tipo.getId())
+                .nombre(tipo.getNombre())
+                .aviso(tipo.getAviso())
+                .numerarApartados(tipo.getNumerarApartados())
+                .apartados(tipo.getApartados() == null ? List.of() : tipo.getApartados().stream()
+                        .map(a -> CondicionesSnapshotResponse.ApartadoSnapshot.builder()
+                                .titulo(a.getTitulo())
+                                .estilo(a.getEstilo())
+                                .condiciones(a.getCondiciones() == null ? List.of() : a.getCondiciones().stream()
+                                        .filter(c -> Boolean.TRUE.equals(c.getSeleccionada()))
+                                        .map(c -> CondicionesSnapshotResponse.CondicionSnapshot.builder().texto(c.getTexto()).build())
+                                        .toList())
+                                .build())
+                        .toList())
+                .build();
+
+        try {
+            return new CondicionesResueltas(tipo.getId(), objectMapper.writeValueAsString(snapshot));
+        } catch (Exception e) {
+            throw new IllegalStateException("No se pudo generar el snapshot de condiciones", e);
+        }
+    }
+
+    private CondicionesSnapshotResponse parseCondiciones(String snapshotJson) {
+        if (snapshotJson == null || snapshotJson.isBlank()) return null;
+        try {
+            return objectMapper.readValue(snapshotJson, CondicionesSnapshotResponse.class);
+        } catch (Exception e) {
+            log.warn("No se pudo deserializar el snapshot de condiciones: {}", e.getMessage());
+            return null;
+        }
     }
 }

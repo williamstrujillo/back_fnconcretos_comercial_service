@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -144,4 +145,10 @@ public class Pedido {
 
     @Column(name = "actualizado_en")
     private LocalDateTime actualizadoEn;
+
+    /** Copia textual de Cotizacion.condicionesSnapshot al momento de convertir -- el pedido hereda
+     * exactamente lo que se cotizo, no se vuelve a resolver contra el catalogo. */
+    @Lob
+    @Column(name = "condiciones_snapshot", columnDefinition = "LONGTEXT")
+    private String condicionesSnapshot;
 }
