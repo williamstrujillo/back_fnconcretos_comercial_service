@@ -31,6 +31,7 @@ public class CotizacionPublicaResponse {
     private TotalesInfo totales;
     private VendedorInfo vendedor;
     private String observaciones;
+    private CondicionesSnapshotResponse condiciones;
 
     @Data
     @NoArgsConstructor

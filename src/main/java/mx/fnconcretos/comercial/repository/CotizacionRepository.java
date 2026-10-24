@@ -6,4 +6,6 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 
 public interface CotizacionRepository extends JpaRepository<Cotizacion, Long>, JpaSpecificationExecutor<Cotizacion> {
     boolean existsByFolio(String folio);
+
+    boolean existsByTipoCondicionId(Long tipoCondicionId);
 }

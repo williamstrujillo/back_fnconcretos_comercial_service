@@ -10,6 +10,7 @@ import mx.fnconcretos.comercial.dto.request.CotizacionRequest;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
 import mx.fnconcretos.comercial.dto.response.BitacoraEventoResponse;
 import mx.fnconcretos.comercial.dto.response.CotizacionResponse;
+import mx.fnconcretos.comercial.dto.response.EnUsoResponse;
 import mx.fnconcretos.comercial.dto.response.PedidoResponse;
 import mx.fnconcretos.comercial.dto.response.WhatsAppEnvioResponse;
 import mx.fnconcretos.comercial.security.JwtPrincipal;
@@ -95,5 +96,11 @@ public class CotizacionController {
     @Operation(summary = "Historial completo de acciones sobre la cotizacion (quien y cuando), en orden mas reciente primero")
     public List<BitacoraEventoResponse> bitacora(@PathVariable Long id) {
         return bitacoraService.listar("cotizacion", id);
+    }
+
+    @GetMapping("/usa-tipo-condicion/{tipoCondicionId}")
+    @Operation(summary = "Si alguna cotizacion ya usa ese tipo de condicion (catalogo-service lo consulta antes de borrarlo)")
+    public EnUsoResponse usaTipoCondicion(@PathVariable Long tipoCondicionId) {
+        return EnUsoResponse.builder().enUso(cotizacionService.usaTipoCondicion(tipoCondicionId)).build();
     }
 }

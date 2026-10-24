@@ -63,4 +63,8 @@ public class CotizacionRequest {
 
     @Size(max = 250, message = "Las observaciones no pueden exceder 250 caracteres")
     private String observaciones;
+
+    /** Tipo de condicion comercial en catalogo-service. Opcional -- si no viene, se usa el tipo
+     * predeterminado activo; si tampoco hay uno, la cotizacion queda sin hoja de condiciones. */
+    private Long tipoCondicionId;
 }

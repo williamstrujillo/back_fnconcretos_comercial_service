@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mx.fnconcretos.comercial.client.CatalogoClient;
+import mx.fnconcretos.comercial.dto.response.CondicionesSnapshotResponse;
 import mx.fnconcretos.comercial.dto.response.CotizacionPublicaResponse;
 import mx.fnconcretos.comercial.dto.response.TokenCompartidoResponse;
 import mx.fnconcretos.comercial.entity.Cotizacion;
@@ -119,6 +120,7 @@ public class CotizacionCompartidaService {
                 .totales(construirTotales(cotizacion))
                 .vendedor(construirVendedor(cotizacion))
                 .observaciones(cotizacion.getObservaciones())
+                .condiciones(parseCondiciones(cotizacion.getCondicionesSnapshot()))
                 .build();
 
         try {
@@ -254,6 +256,18 @@ public class CotizacionCompartidaService {
                 .nombre(cotizacion.getAsesor().getNombre())
                 .telefono(null)
                 .build();
+    }
+
+    /** Ya congelado en la cotizacion al crear/actualizar (ver CotizacionService.resolverCondiciones)
+     * -- aqui solo se deserializa, nunca se vuelve a resolver contra catalogo-service. */
+    private CondicionesSnapshotResponse parseCondiciones(String snapshotJson) {
+        if (snapshotJson == null || snapshotJson.isBlank()) return null;
+        try {
+            return objectMapper.readValue(snapshotJson, CondicionesSnapshotResponse.class);
+        } catch (Exception e) {
+            log.warn("No se pudo deserializar el snapshot de condiciones: {}", e.getMessage());
+            return null;
+        }
     }
 
     private String generarToken() {
