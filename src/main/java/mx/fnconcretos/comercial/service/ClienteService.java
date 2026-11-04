@@ -2,6 +2,7 @@ package mx.fnconcretos.comercial.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import mx.fnconcretos.comercial.client.AuditoriaClient;
 import mx.fnconcretos.comercial.client.FinanzasClient;
 import mx.fnconcretos.comercial.dto.request.ClienteRequest;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
@@ -13,6 +14,7 @@ import mx.fnconcretos.comercial.exception.ConflictException;
 import mx.fnconcretos.comercial.exception.ResourceNotFoundException;
 import mx.fnconcretos.comercial.repository.AsesorComercialRepository;
 import mx.fnconcretos.comercial.repository.ClienteRepository;
+import mx.fnconcretos.comercial.security.JwtPrincipal;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,6 +32,7 @@ public class ClienteService {
     private final ClienteRepository clienteRepository;
     private final AsesorComercialRepository asesorRepository;
     private final FinanzasClient finanzasClient;
+    private final AuditoriaClient auditoriaClient;
 
     @Transactional(readOnly = true)
     public List<ClienteResponse> listar(String tipo, String estatus, String q) {
@@ -52,7 +55,7 @@ public class ClienteService {
     }
 
     @Transactional
-    public ClienteResponse crear(ClienteRequest request) {
+    public ClienteResponse crear(ClienteRequest request, JwtPrincipal principal) {
         String numeroCliente = request.getNumeroCliente() != null && !request.getNumeroCliente().isBlank()
                 ? request.getNumeroCliente()
                 : generarNumeroCliente();
@@ -79,7 +82,9 @@ public class ClienteService {
                 .modalidadFacturacion(resolverModalidadFacturacion(request.getModalidadFacturacion()))
                 .build();
 
-        return toResponse(clienteRepository.save(cliente));
+        Cliente guardado = clienteRepository.save(cliente);
+        registrarAuditoria("creacion", guardado, principal);
+        return toResponse(guardado);
     }
 
     /** Siguiente folio "CLI-0001", "CLI-0002"... a partir del mayor numero existente con ese formato. */
@@ -99,7 +104,7 @@ public class ClienteService {
     }
 
     @Transactional
-    public ClienteResponse actualizar(Long id, ClienteRequest request) {
+    public ClienteResponse actualizar(Long id, ClienteRequest request, JwtPrincipal principal) {
         Cliente cliente = buscarOFallar(id);
 
         if (!cliente.getNumeroCliente().equals(request.getNumeroCliente())
@@ -122,7 +127,19 @@ public class ClienteService {
         cliente.setPorcentajeComision(resolverPorcentajeComision(cliente.getOrigenCaptacion(), request.getPorcentajeComision()));
         if (request.getModalidadFacturacion() != null) cliente.setModalidadFacturacion(resolverModalidadFacturacion(request.getModalidadFacturacion()));
 
-        return toResponse(clienteRepository.save(cliente));
+        Cliente guardado = clienteRepository.save(cliente);
+        registrarAuditoria("edicion", guardado, principal);
+        return toResponse(guardado);
+    }
+
+    private void registrarAuditoria(String accion, Cliente cliente, JwtPrincipal principal) {
+        String detalle = "creacion".equals(accion)
+                ? "Cliente " + cliente.getNumeroCliente() + " (" + cliente.getNombre() + ") dado de alta"
+                : "Cliente " + cliente.getNumeroCliente() + " (" + cliente.getNombre() + ") actualizado";
+        auditoriaClient.registrar(
+                principal != null ? principal.usuarioId() : null,
+                principal != null ? principal.user() : "Sistema",
+                accion, "Clientes", detalle, "cliente", cliente.getId(), null);
     }
 
     /**
@@ -157,10 +174,17 @@ public class ClienteService {
     }
 
     @Transactional
-    public ClienteResponse cambiarEstatus(Long id, EstatusRequest request) {
+    public ClienteResponse cambiarEstatus(Long id, EstatusRequest request, JwtPrincipal principal) {
         Cliente cliente = buscarOFallar(id);
         cliente.setEstatus(request.getEstatus());
-        return toResponse(clienteRepository.save(cliente));
+        Cliente guardado = clienteRepository.save(cliente);
+        auditoriaClient.registrar(
+                principal != null ? principal.usuarioId() : null,
+                principal != null ? principal.user() : "Sistema",
+                "edicion", "Clientes",
+                "Cliente " + guardado.getNumeroCliente() + " (" + guardado.getNombre() + ") cambio de estatus a " + guardado.getEstatus(),
+                "cliente", guardado.getId(), null);
+        return toResponse(guardado);
     }
 
     /**

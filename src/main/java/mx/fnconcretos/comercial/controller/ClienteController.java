@@ -9,9 +9,11 @@ import mx.fnconcretos.comercial.dto.request.ClienteRequest;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
 import mx.fnconcretos.comercial.dto.response.ClienteResponse;
 import mx.fnconcretos.comercial.dto.response.EstadoCuentaResponse;
+import mx.fnconcretos.comercial.security.JwtPrincipal;
 import mx.fnconcretos.comercial.service.ClienteService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,8 +38,8 @@ public class ClienteController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Alta de cliente")
-    public ClienteResponse crear(@Valid @RequestBody ClienteRequest request) {
-        return clienteService.crear(request);
+    public ClienteResponse crear(@Valid @RequestBody ClienteRequest request, @AuthenticationPrincipal JwtPrincipal principal) {
+        return clienteService.crear(request, principal);
     }
 
     @GetMapping("/{id}")
@@ -48,14 +50,16 @@ public class ClienteController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar datos de un cliente")
-    public ClienteResponse actualizar(@PathVariable Long id, @Valid @RequestBody ClienteRequest request) {
-        return clienteService.actualizar(id, request);
+    public ClienteResponse actualizar(@PathVariable Long id, @Valid @RequestBody ClienteRequest request,
+                                       @AuthenticationPrincipal JwtPrincipal principal) {
+        return clienteService.actualizar(id, request, principal);
     }
 
     @PatchMapping("/{id}/estatus")
     @Operation(summary = "Activar/desactivar un cliente")
-    public ClienteResponse cambiarEstatus(@PathVariable Long id, @Valid @RequestBody EstatusRequest request) {
-        return clienteService.cambiarEstatus(id, request);
+    public ClienteResponse cambiarEstatus(@PathVariable Long id, @Valid @RequestBody EstatusRequest request,
+                                           @AuthenticationPrincipal JwtPrincipal principal) {
+        return clienteService.cambiarEstatus(id, request, principal);
     }
 
     @GetMapping("/{id}/estado-cuenta")
