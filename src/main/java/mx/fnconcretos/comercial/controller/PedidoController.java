@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import mx.fnconcretos.comercial.dto.request.AjustarVolumenPedidoRequest;
+import mx.fnconcretos.comercial.dto.request.CambiarProductoPedidoRequest;
 import mx.fnconcretos.comercial.dto.request.PedidoUpdateRequest;
 import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
 import mx.fnconcretos.comercial.dto.response.AvancePedidoResponse;
@@ -81,6 +82,16 @@ public class PedidoController {
                                           @Valid @RequestBody AjustarVolumenPedidoRequest request,
                                           @AuthenticationPrincipal JwtPrincipal principal) {
         return pedidoService.ajustarVolumen(id, detalleId, request, principal);
+    }
+
+    @PatchMapping("/{id}/detalle/{detalleId}/cambiar-producto")
+    @Operation(summary = "Cambiar el producto (ej. resistencia) de una linea del pedido -- cada resistencia es un "
+            + "producto distinto en el catalogo. Solo permitido mientras la linea no tenga nada entregado "
+            + "(antes de que salga la primera remision).")
+    public PedidoResponse cambiarProducto(@PathVariable Long id, @PathVariable Long detalleId,
+                                           @Valid @RequestBody CambiarProductoPedidoRequest request,
+                                           @AuthenticationPrincipal JwtPrincipal principal) {
+        return pedidoService.cambiarProducto(id, detalleId, request, principal);
     }
 
     @PostMapping("/{id}/enviar-whatsapp-seguimiento")
