@@ -77,6 +77,12 @@ public class CotizacionService {
     @Value("${negocio.descuento.max-con-factura}")
     private BigDecimal descuentoMaxConFactura;
 
+    @Value("${negocio.descuento.min-asesor}")
+    private BigDecimal descuentoMinAsesor;
+
+    @Value("${negocio.descuento.max-asesor}")
+    private BigDecimal descuentoMaxAsesor;
+
     @Value("${negocio.precio-foraneo.umbral-1-km}")
     private BigDecimal umbralForaneo1Km;
 
@@ -609,20 +615,36 @@ public class CotizacionService {
                 .orElse(BigDecimal.ZERO);
     }
 
-    /** Rango habilitado (no min a max) segun requiereFactura, sin importar formaPago: sin factura
+    /** Rango habilitado segun quien cotiza. Si el usuario tiene el rol "Asesor Comercial" (interno
+     * o externo, sin distincion), aplica un rango unico descuentoMinAsesor-descuentoMaxAsesor
+     * (default 5-10%), sin importar requiereFactura/formaPago. Para cualquier otro rol (ej. Call
+     * Center) se mantiene el rango previo segun requiereFactura: sin factura
      * descuentoMinSinFactura-descuentoMaxSinFactura (default 0-6%), con factura
-     * descuentoMinConFactura-descuentoMaxConFactura (default 8-11%). Salirse del rango (por
-     * arriba O por abajo) requiere el permiso cotizaciones.aplicar_descuento_especial. */
+     * descuentoMinConFactura-descuentoMaxConFactura (default 8-11%). Salirse del rango que
+     * corresponda (por arriba O por abajo) requiere el permiso
+     * cotizaciones.aplicar_descuento_especial. */
     private void validarDescuento(BigDecimal descuento, Boolean requiereFactura, JwtPrincipal principal) {
         BigDecimal valor = descuento != null ? descuento : BigDecimal.ZERO;
-        boolean factura = Boolean.TRUE.equals(requiereFactura);
-        BigDecimal min = factura ? descuentoMinConFactura : descuentoMinSinFactura;
-        BigDecimal max = factura ? descuentoMaxConFactura : descuentoMaxSinFactura;
+        boolean esAsesorComercial = principal != null && ROL_ASESOR_COMERCIAL.equals(principal.rol());
+
+        BigDecimal min;
+        BigDecimal max;
+        String etiquetaRango;
+        if (esAsesorComercial) {
+            min = descuentoMinAsesor;
+            max = descuentoMaxAsesor;
+            etiquetaRango = "para asesores comerciales";
+        } else {
+            boolean factura = Boolean.TRUE.equals(requiereFactura);
+            min = factura ? descuentoMinConFactura : descuentoMinSinFactura;
+            max = factura ? descuentoMaxConFactura : descuentoMaxSinFactura;
+            etiquetaRango = "para cotizaciones " + (factura ? "con" : "sin") + " factura";
+        }
 
         boolean fueraDeRango = valor.compareTo(min) < 0 || valor.compareTo(max) > 0;
         if (fueraDeRango && (principal == null || !principal.tienePermiso("cotizaciones.aplicar_descuento_especial"))) {
             throw new AccessDeniedException("El descuento de " + valor + "% esta fuera del rango permitido (" + min + "% - " + max
-                    + "%) para cotizaciones " + (factura ? "con" : "sin") + " factura; se requiere el permiso cotizaciones.aplicar_descuento_especial");
+                    + "%) " + etiquetaRango + "; se requiere el permiso cotizaciones.aplicar_descuento_especial");
         }
     }
 
