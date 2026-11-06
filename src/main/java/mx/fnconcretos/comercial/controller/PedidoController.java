@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import mx.fnconcretos.comercial.dto.request.AjustarVolumenPedidoRequest;
 import mx.fnconcretos.comercial.dto.request.PedidoUpdateRequest;
 import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
 import mx.fnconcretos.comercial.dto.response.AvancePedidoResponse;
@@ -70,6 +71,16 @@ public class PedidoController {
     public PedidoResponse registrarEntrega(@PathVariable Long id, @Valid @RequestBody RegistrarEntregaRequest request,
                                             @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
         return pedidoService.registrarEntrega(id, request, authorization);
+    }
+
+    @PatchMapping("/{id}/detalle/{detalleId}/ajustar-volumen")
+    @Operation(summary = "Ajustar el volumen (y por lo tanto el precioTotal) de una linea de producto del pedido -- "
+            + "ej. el cliente pide mas o menos m3 en la ultima remision que aun va a salir. Nunca permite bajar de "
+            + "lo ya entregado. No vuelve a pedir autorizacion de pago aunque el monto suba.")
+    public PedidoResponse ajustarVolumen(@PathVariable Long id, @PathVariable Long detalleId,
+                                          @Valid @RequestBody AjustarVolumenPedidoRequest request,
+                                          @AuthenticationPrincipal JwtPrincipal principal) {
+        return pedidoService.ajustarVolumen(id, detalleId, request, principal);
     }
 
     @PostMapping("/{id}/enviar-whatsapp-seguimiento")
