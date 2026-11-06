@@ -7,6 +7,8 @@ import mx.fnconcretos.comercial.client.FinanzasClient;
 import mx.fnconcretos.comercial.client.NotificacionClient;
 import mx.fnconcretos.comercial.client.OperacionesClient;
 import mx.fnconcretos.comercial.client.WhatsAppClient;
+import mx.fnconcretos.comercial.dto.request.AjustarVolumenPedidoRequest;
+import mx.fnconcretos.comercial.dto.request.CambiarProductoPedidoRequest;
 import mx.fnconcretos.comercial.dto.request.PedidoUpdateRequest;
 import mx.fnconcretos.comercial.dto.request.RegistrarEntregaRequest;
 import mx.fnconcretos.comercial.dto.response.AutorizacionResponse;
@@ -29,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
@@ -192,6 +195,104 @@ public class PedidoService {
         bitacoraService.registrar("pedido", guardado.getId(), "entrega", descripcionEntrega, null);
 
         return toResponse(guardado);
+    }
+
+    /** Ajusta el volumen (y por lo tanto el precioTotal) de UNA linea de producto del pedido --
+     * junta de jefes 2026-11-05: "el cliente decide que en su ultima remision que aun va a salir
+     * necesita mas o menos m3". Nunca baja de lo ya entregado (linea.volumenEntregadoM3). Decisiones
+     * de negocio confirmadas por el usuario: (1) no se vuelve a pedir autorizacion de pago aunque el
+     * monto suba -- se permite cobrar la diferencia despues o contra entrega; (2) este ajuste solo
+     * ocurre el mismo dia de la entrega, antes de cualquier corte de comisiones, asi que nunca debe
+     * tocar una comision ya generada (no se intenta detectar ni corregir eso aqui).
+     */
+    @Transactional
+    public PedidoResponse ajustarVolumen(Long id, Long detalleId, AjustarVolumenPedidoRequest request, JwtPrincipal principal) {
+        Pedido pedido = buscarOFallar(id);
+        PedidoDetalle linea = pedidoDetalleRepository.findById(detalleId)
+                .filter(l -> l.getPedido().getId().equals(id))
+                .orElseThrow(() -> new ResourceNotFoundException("La linea " + detalleId + " no pertenece al pedido " + id));
+
+        if (!"producto".equals(linea.getTipoLinea())) {
+            throw new IllegalArgumentException("Solo se puede ajustar el volumen de una linea tipo 'producto'");
+        }
+        if (request.getNuevoVolumenM3().compareTo(linea.getVolumenEntregadoM3()) < 0) {
+            throw new EstadoInvalidoException("El nuevo volumen (" + request.getNuevoVolumenM3()
+                    + " m3) no puede ser menor a lo ya entregado de esta linea (" + linea.getVolumenEntregadoM3() + " m3)");
+        }
+
+        BigDecimal volumenAnterior = linea.getVolumenSolicitadoM3();
+        BigDecimal precioTotalAnterior = linea.getPrecioTotal();
+
+        linea.setVolumenSolicitadoM3(request.getNuevoVolumenM3());
+        linea.setVolumenPendienteM3(request.getNuevoVolumenM3().subtract(linea.getVolumenEntregadoM3()));
+        linea.setPrecioTotal(linea.getPrecioUnitario().multiply(request.getNuevoVolumenM3()).setScale(2, RoundingMode.HALF_UP));
+        pedidoDetalleRepository.save(linea);
+
+        List<PedidoDetalle> lineasProducto = pedidoDetalleRepository.findByPedidoId(id).stream()
+                .filter(l -> "producto".equals(l.getTipoLinea()))
+                .toList();
+        BigDecimal sumSolicitado = lineasProducto.stream().map(PedidoDetalle::getVolumenSolicitadoM3).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal sumPendiente = lineasProducto.stream().map(PedidoDetalle::getVolumenPendienteM3).reduce(BigDecimal.ZERO, BigDecimal::add);
+        boolean todasLasLineasCompletas = lineasProducto.stream().allMatch(l -> l.getVolumenPendienteM3().signum() <= 0);
+
+        pedido.setVolumenSolicitadoM3(sumSolicitado);
+        pedido.setVolumenPendienteM3(sumPendiente);
+        // Si el pedido ya estaba "completo" y el ajuste sube el volumen (vuelve a quedar pendiente),
+        // regresa a "parcial" -- mismo criterio que registrarEntrega, solo cuando el estatus actual
+        // ya es uno de entrega (nunca toca pendiente_autorizacion_pago/autorizado/rechazado).
+        if (ESTATUS_PERMITEN_ENTREGA.contains(pedido.getEstatusGeneral()) || "completo".equals(pedido.getEstatusGeneral())) {
+            pedido.setEstatusGeneral(todasLasLineasCompletas ? "completo" : "parcial");
+        }
+
+        Pedido guardado = pedidoRepository.save(pedido);
+
+        String detalle = "Volumen ajustado de la linea " + detalleId + ": " + volumenAnterior + " m3 ($" + precioTotalAnterior
+                + ") -> " + request.getNuevoVolumenM3() + " m3 ($" + linea.getPrecioTotal() + "). Motivo: " + request.getMotivo();
+        bitacoraService.registrar("pedido", guardado.getId(), "ajuste_volumen", detalle, principal != null ? principal.user() : null);
+
+        return toResponse(guardado);
+    }
+
+    /** Cambia el producto (ej. resistencia) de una linea del pedido -- junta de jefes 2026-11-05/06:
+     * "el cliente requiera algun cambio de resistencia en su pedido". Cada resistencia es un
+     * producto distinto en el catalogo (propia receta, propio precio) -- este cambio solo mueve
+     * productoId/precio de la linea; la receta correcta la resuelve sola operaciones-service por
+     * productoId+planta al generar la remision, sin cambios adicionales.
+     *
+     * Solo permitido mientras la linea no tenga nada entregado -- caso confirmado por el usuario:
+     * "el pedido todavia no ha salido ninguna remision". NO protege contra una remision ya
+     * "generada"/"programada" en operaciones-service que aun no entrega (ese caso quedo
+     * explicitamente pendiente de definir, el usuario pidio dejarlo asi por ahora).
+     */
+    @Transactional
+    public PedidoResponse cambiarProducto(Long id, Long detalleId, CambiarProductoPedidoRequest request, JwtPrincipal principal) {
+        Pedido pedido = buscarOFallar(id);
+        PedidoDetalle linea = pedidoDetalleRepository.findById(detalleId)
+                .filter(l -> l.getPedido().getId().equals(id))
+                .orElseThrow(() -> new ResourceNotFoundException("La linea " + detalleId + " no pertenece al pedido " + id));
+
+        if (!"producto".equals(linea.getTipoLinea())) {
+            throw new IllegalArgumentException("Solo se puede cambiar el producto de una linea tipo 'producto'");
+        }
+        if (linea.getVolumenEntregadoM3().signum() > 0) {
+            throw new EstadoInvalidoException("No se puede cambiar el producto de la linea " + detalleId + ": ya tiene "
+                    + linea.getVolumenEntregadoM3() + " m3 entregados. Solo se permite antes de que salga la primera remision.");
+        }
+
+        Long productoAnterior = linea.getProductoId();
+        BigDecimal precioAnterior = linea.getPrecioUnitario();
+
+        linea.setProductoId(request.getNuevoProductoId());
+        linea.setPrecioUnitarioBase(request.getNuevoPrecioUnitario());
+        linea.setPrecioUnitario(request.getNuevoPrecioUnitario());
+        linea.setPrecioTotal(request.getNuevoPrecioUnitario().multiply(linea.getVolumenSolicitadoM3()).setScale(2, RoundingMode.HALF_UP));
+        pedidoDetalleRepository.save(linea);
+
+        String detalle = "Producto de la linea " + detalleId + " cambiado de #" + productoAnterior + " ($" + precioAnterior
+                + "/m3) a #" + request.getNuevoProductoId() + " ($" + request.getNuevoPrecioUnitario() + "/m3). Motivo: " + request.getMotivo();
+        bitacoraService.registrar("pedido", pedido.getId(), "cambio_producto", detalle, principal != null ? principal.user() : null);
+
+        return toResponse(pedido);
     }
 
     private void notificarAsesor(Pedido pedido, String bearerToken) {
