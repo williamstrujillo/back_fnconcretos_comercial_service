@@ -35,7 +35,7 @@ public class ClienteService {
     private final AuditoriaClient auditoriaClient;
 
     @Transactional(readOnly = true)
-    public List<ClienteResponse> listar(String tipo, String estatus, String q) {
+    public List<ClienteResponse> listar(String tipo, String estatus, String q, JwtPrincipal principal) {
         Specification<Cliente> spec = Specification.where(null);
 
         if (tipo != null && !tipo.isBlank()) {
@@ -49,6 +49,10 @@ public class ClienteService {
             spec = spec.and((root, query, cb) -> cb.or(
                     cb.like(cb.lower(root.get("nombre")), like),
                     cb.like(cb.lower(root.get("numeroCliente")), like)));
+        }
+        if (esAsesorComercial(principal)) {
+            Long miAsesorId = miAsesor(principal).getId();
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("asesorAsignado").get("id"), miAsesorId));
         }
 
         return clienteRepository.findAll(spec).stream().map(this::toResponse).toList();
@@ -64,6 +68,11 @@ public class ClienteService {
         }
 
         String origenCaptacion = request.getOrigenCaptacion() != null ? request.getOrigenCaptacion() : "asignado";
+        // Un Asesor Comercial siempre registra el cliente a su propio nombre -- nunca puede
+        // asignarselo a otro asesor, sin importar lo que venga en el request.
+        AsesorComercial asesorAsignado = esAsesorComercial(principal)
+                ? miAsesor(principal)
+                : resolverAsesor(request.getAsesorAsignadoId());
 
         Cliente cliente = Cliente.builder()
                 .numeroCliente(numeroCliente)
@@ -74,7 +83,7 @@ public class ClienteService {
                 .whatsappDisponible(request.getWhatsappDisponible() != null ? request.getWhatsappDisponible() : false)
                 .correo(request.getCorreo())
                 .requiereFacturaDefault(request.getRequiereFacturaDefault() != null ? request.getRequiereFacturaDefault() : false)
-                .asesorAsignado(resolverAsesor(request.getAsesorAsignadoId()))
+                .asesorAsignado(asesorAsignado)
                 .limiteCredito(request.getLimiteCredito() != null ? request.getLimiteCredito() : BigDecimal.ZERO)
                 .diasCredito(request.getDiasCredito() != null ? request.getDiasCredito() : 0)
                 .origenCaptacion(origenCaptacion)
@@ -99,13 +108,13 @@ public class ClienteService {
     }
 
     @Transactional(readOnly = true)
-    public ClienteResponse obtener(Long id) {
-        return toResponse(buscarOFallar(id));
+    public ClienteResponse obtener(Long id, JwtPrincipal principal) {
+        return toResponse(buscarPropioOFallar(id, principal));
     }
 
     @Transactional
     public ClienteResponse actualizar(Long id, ClienteRequest request, JwtPrincipal principal) {
-        Cliente cliente = buscarOFallar(id);
+        Cliente cliente = buscarPropioOFallar(id, principal);
 
         if (!cliente.getNumeroCliente().equals(request.getNumeroCliente())
                 && clienteRepository.existsByNumeroCliente(request.getNumeroCliente())) {
@@ -120,7 +129,11 @@ public class ClienteService {
         if (request.getWhatsappDisponible() != null) cliente.setWhatsappDisponible(request.getWhatsappDisponible());
         cliente.setCorreo(request.getCorreo());
         if (request.getRequiereFacturaDefault() != null) cliente.setRequiereFacturaDefault(request.getRequiereFacturaDefault());
-        cliente.setAsesorAsignado(resolverAsesor(request.getAsesorAsignadoId()));
+        // Un Asesor Comercial nunca puede reasignar su cliente a otro asesor -- se ignora lo que
+        // venga en el request y se conserva a si mismo.
+        if (!esAsesorComercial(principal)) {
+            cliente.setAsesorAsignado(resolverAsesor(request.getAsesorAsignadoId()));
+        }
         if (request.getLimiteCredito() != null) cliente.setLimiteCredito(request.getLimiteCredito());
         if (request.getDiasCredito() != null) cliente.setDiasCredito(request.getDiasCredito());
         if (request.getOrigenCaptacion() != null) cliente.setOrigenCaptacion(request.getOrigenCaptacion());
@@ -175,7 +188,7 @@ public class ClienteService {
 
     @Transactional
     public ClienteResponse cambiarEstatus(Long id, EstatusRequest request, JwtPrincipal principal) {
-        Cliente cliente = buscarOFallar(id);
+        Cliente cliente = buscarPropioOFallar(id, principal);
         cliente.setEstatus(request.getEstatus());
         Cliente guardado = clienteRepository.save(cliente);
         auditoriaClient.registrar(
@@ -263,6 +276,31 @@ public class ClienteService {
     protected Cliente buscarOFallar(Long id) {
         return clienteRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cliente no encontrado: " + id));
+    }
+
+    /** Igual que buscarOFallar, pero ademas valida que el cliente le pertenezca cuando quien pide
+     * es un Asesor Comercial -- 404 (no 403) para no revelar que el cliente existe pero es de
+     * otro asesor. El modelo ya tenia Cliente.asesorAsignado; antes nada en el backend lo exigia. */
+    private Cliente buscarPropioOFallar(Long id, JwtPrincipal principal) {
+        Cliente cliente = buscarOFallar(id);
+        if (esAsesorComercial(principal)) {
+            Long miAsesorId = miAsesor(principal).getId();
+            AsesorComercial asignado = cliente.getAsesorAsignado();
+            if (asignado == null || !asignado.getId().equals(miAsesorId)) {
+                throw new ResourceNotFoundException("Cliente no encontrado: " + id);
+            }
+        }
+        return cliente;
+    }
+
+    private boolean esAsesorComercial(JwtPrincipal principal) {
+        return principal != null && "Asesor Comercial".equals(principal.rol());
+    }
+
+    private AsesorComercial miAsesor(JwtPrincipal principal) {
+        return asesorRepository.findByUsuarioId(principal.usuarioId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "El usuario " + principal.usuarioId() + " no tiene un asesor comercial asociado"));
     }
 
     private AsesorComercial resolverAsesor(Long asesorId) {

@@ -6,15 +6,18 @@ import mx.fnconcretos.comercial.dto.request.ObraRequest;
 import mx.fnconcretos.comercial.dto.request.VincularClienteRequest;
 import mx.fnconcretos.comercial.dto.response.ClienteObraResponse;
 import mx.fnconcretos.comercial.dto.response.ObraResponse;
+import mx.fnconcretos.comercial.entity.AsesorComercial;
 import mx.fnconcretos.comercial.entity.Cliente;
 import mx.fnconcretos.comercial.entity.ClienteObra;
 import mx.fnconcretos.comercial.entity.ContactoCliente;
 import mx.fnconcretos.comercial.entity.Obra;
 import mx.fnconcretos.comercial.exception.ConflictException;
 import mx.fnconcretos.comercial.exception.ResourceNotFoundException;
+import mx.fnconcretos.comercial.repository.AsesorComercialRepository;
 import mx.fnconcretos.comercial.repository.ClienteObraRepository;
 import mx.fnconcretos.comercial.repository.ContactoClienteRepository;
 import mx.fnconcretos.comercial.repository.ObraRepository;
+import mx.fnconcretos.comercial.security.JwtPrincipal;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,9 +37,10 @@ public class ObraService {
     private final ClienteObraRepository clienteObraRepository;
     private final ContactoClienteRepository contactoClienteRepository;
     private final ClienteService clienteService;
+    private final AsesorComercialRepository asesorRepository;
 
     @Transactional(readOnly = true)
-    public List<ObraResponse> listar(String estatus, String ciudad, String q) {
+    public List<ObraResponse> listar(String estatus, String ciudad, String q, JwtPrincipal principal) {
         Specification<Obra> spec = Specification.where(null);
 
         if (estatus != null && !estatus.isBlank()) {
@@ -49,15 +53,30 @@ public class ObraService {
             String like = "%" + q.toLowerCase() + "%";
             spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("nombre")), like));
         }
+        if (esAsesorComercial(principal)) {
+            Long miAsesorId = miAsesor(principal).getId();
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("clientePrincipal").get("asesorAsignado").get("id"), miAsesorId));
+        }
 
         return obraRepository.findAll(spec).stream().map(this::toResponse).toList();
     }
 
     @Transactional
-    public ObraResponse crear(ObraRequest request) {
+    public ObraResponse crear(ObraRequest request, JwtPrincipal principal) {
         Cliente clientePrincipal = request.getClientePrincipalId() != null
                 ? clienteService.buscarOFallar(request.getClientePrincipalId())
                 : null;
+
+        // Un Asesor Comercial solo puede dar de alta obras de un cliente propio -- la obra no
+        // tiene su propio campo de asesor, se hereda del cliente principal.
+        if (esAsesorComercial(principal)) {
+            Long miAsesorId = miAsesor(principal).getId();
+            boolean esDeMiCliente = clientePrincipal != null && clientePrincipal.getAsesorAsignado() != null
+                    && clientePrincipal.getAsesorAsignado().getId().equals(miAsesorId);
+            if (!esDeMiCliente) {
+                throw new ResourceNotFoundException("Cliente no encontrado: " + request.getClientePrincipalId());
+            }
+        }
 
         BigDecimal[] coords = extraerCoordenadas(request.getGoogleMapsLink());
 
@@ -86,17 +105,26 @@ public class ObraService {
     }
 
     @Transactional(readOnly = true)
-    public ObraResponse obtener(Long id) {
-        return toResponse(buscarOFallar(id));
+    public ObraResponse obtener(Long id, JwtPrincipal principal) {
+        return toResponse(buscarPropiaOFallar(id, principal));
     }
 
     @Transactional
-    public ObraResponse actualizar(Long id, ObraRequest request) {
-        Obra obra = buscarOFallar(id);
+    public ObraResponse actualizar(Long id, ObraRequest request, JwtPrincipal principal) {
+        Obra obra = buscarPropiaOFallar(id, principal);
 
         obra.setNombre(request.getNombre());
         if (request.getClientePrincipalId() != null) {
-            obra.setClientePrincipal(clienteService.buscarOFallar(request.getClientePrincipalId()));
+            Cliente nuevoClientePrincipal = clienteService.buscarOFallar(request.getClientePrincipalId());
+            if (esAsesorComercial(principal)) {
+                Long miAsesorId = miAsesor(principal).getId();
+                boolean esDeMiCliente = nuevoClientePrincipal.getAsesorAsignado() != null
+                        && nuevoClientePrincipal.getAsesorAsignado().getId().equals(miAsesorId);
+                if (!esDeMiCliente) {
+                    throw new ResourceNotFoundException("Cliente no encontrado: " + request.getClientePrincipalId());
+                }
+            }
+            obra.setClientePrincipal(nuevoClientePrincipal);
         }
         obra.setDireccion(request.getDireccion());
 
@@ -117,8 +145,8 @@ public class ObraService {
     }
 
     @Transactional
-    public ObraResponse cambiarEstatus(Long id, EstatusRequest request) {
-        Obra obra = buscarOFallar(id);
+    public ObraResponse cambiarEstatus(Long id, EstatusRequest request, JwtPrincipal principal) {
+        Obra obra = buscarPropiaOFallar(id, principal);
         obra.setEstatus(request.getEstatus());
         return toResponse(obraRepository.save(obra));
     }
@@ -164,6 +192,33 @@ public class ObraService {
     protected Obra buscarOFallar(Long id) {
         return obraRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Obra no encontrada: " + id));
+    }
+
+    /** Igual que buscarOFallar, pero valida que la obra sea de un cliente propio cuando quien pide
+     * es un Asesor Comercial (la obra hereda el "dueno" de su cliente principal, no tiene asesor
+     * propio) -- 404 en vez de 403 para no revelar que la obra existe. */
+    private Obra buscarPropiaOFallar(Long id, JwtPrincipal principal) {
+        Obra obra = buscarOFallar(id);
+        if (esAsesorComercial(principal)) {
+            Long miAsesorId = miAsesor(principal).getId();
+            Cliente clientePrincipal = obra.getClientePrincipal();
+            boolean esDeMiCliente = clientePrincipal != null && clientePrincipal.getAsesorAsignado() != null
+                    && clientePrincipal.getAsesorAsignado().getId().equals(miAsesorId);
+            if (!esDeMiCliente) {
+                throw new ResourceNotFoundException("Obra no encontrada: " + id);
+            }
+        }
+        return obra;
+    }
+
+    private boolean esAsesorComercial(JwtPrincipal principal) {
+        return principal != null && "Asesor Comercial".equals(principal.rol());
+    }
+
+    private AsesorComercial miAsesor(JwtPrincipal principal) {
+        return asesorRepository.findByUsuarioId(principal.usuarioId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "El usuario " + principal.usuarioId() + " no tiene un asesor comercial asociado"));
     }
 
     private BigDecimal[] extraerCoordenadas(String googleMapsLink) {
