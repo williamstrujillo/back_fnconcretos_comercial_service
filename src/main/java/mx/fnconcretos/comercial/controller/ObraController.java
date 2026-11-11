@@ -10,8 +10,10 @@ import mx.fnconcretos.comercial.dto.request.ObraRequest;
 import mx.fnconcretos.comercial.dto.request.VincularClienteRequest;
 import mx.fnconcretos.comercial.dto.response.ClienteObraResponse;
 import mx.fnconcretos.comercial.dto.response.ObraResponse;
+import mx.fnconcretos.comercial.security.JwtPrincipal;
 import mx.fnconcretos.comercial.service.ObraService;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -26,36 +28,41 @@ public class ObraController {
     private final ObraService obraService;
 
     @GetMapping
-    @Operation(summary = "Buscar obras por estatus, ciudad o nombre")
+    @Operation(summary = "Buscar obras por estatus, ciudad o nombre. Un Asesor Comercial solo ve las obras de "
+            + "sus propios clientes.")
     public List<ObraResponse> listar(@RequestParam(required = false) String estatus,
                                       @RequestParam(required = false) String ciudad,
-                                      @RequestParam(required = false) String q) {
-        return obraService.listar(estatus, ciudad, q);
+                                      @RequestParam(required = false) String q,
+                                      @AuthenticationPrincipal JwtPrincipal principal) {
+        return obraService.listar(estatus, ciudad, q, principal);
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Alta de obra")
-    public ObraResponse crear(@Valid @RequestBody ObraRequest request) {
-        return obraService.crear(request);
+    @Operation(summary = "Alta de obra. Un Asesor Comercial solo puede darla de alta para un cliente propio.")
+    public ObraResponse crear(@Valid @RequestBody ObraRequest request, @AuthenticationPrincipal JwtPrincipal principal) {
+        return obraService.crear(request, principal);
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Obtener detalle de una obra")
-    public ObraResponse obtener(@PathVariable Long id) {
-        return obraService.obtener(id);
+    @Operation(summary = "Obtener detalle de una obra. Un Asesor Comercial solo puede ver las de sus propios "
+            + "clientes (404 si no le pertenece).")
+    public ObraResponse obtener(@PathVariable Long id, @AuthenticationPrincipal JwtPrincipal principal) {
+        return obraService.obtener(id, principal);
     }
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar datos de una obra")
-    public ObraResponse actualizar(@PathVariable Long id, @Valid @RequestBody ObraRequest request) {
-        return obraService.actualizar(id, request);
+    public ObraResponse actualizar(@PathVariable Long id, @Valid @RequestBody ObraRequest request,
+                                    @AuthenticationPrincipal JwtPrincipal principal) {
+        return obraService.actualizar(id, request, principal);
     }
 
     @PatchMapping("/{id}/estatus")
     @Operation(summary = "Activar/desactivar una obra")
-    public ObraResponse cambiarEstatus(@PathVariable Long id, @Valid @RequestBody EstatusRequest request) {
-        return obraService.cambiarEstatus(id, request);
+    public ObraResponse cambiarEstatus(@PathVariable Long id, @Valid @RequestBody EstatusRequest request,
+                                        @AuthenticationPrincipal JwtPrincipal principal) {
+        return obraService.cambiarEstatus(id, request, principal);
     }
 
     @PostMapping("/{id}/clientes")

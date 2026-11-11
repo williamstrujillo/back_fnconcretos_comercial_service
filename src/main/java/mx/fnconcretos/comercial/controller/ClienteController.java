@@ -28,11 +28,13 @@ public class ClienteController {
     private final ClienteService clienteService;
 
     @GetMapping
-    @Operation(summary = "Buscar clientes por tipo, estatus o nombre/numero de cliente")
+    @Operation(summary = "Buscar clientes por tipo, estatus o nombre/numero de cliente. Un usuario con rol "
+            + "Asesor Comercial solo ve los clientes asignados a el mismo.")
     public List<ClienteResponse> listar(@RequestParam(required = false) String tipo,
                                          @RequestParam(required = false) String estatus,
-                                         @RequestParam(required = false) String q) {
-        return clienteService.listar(tipo, estatus, q);
+                                         @RequestParam(required = false) String q,
+                                         @AuthenticationPrincipal JwtPrincipal principal) {
+        return clienteService.listar(tipo, estatus, q, principal);
     }
 
     @PostMapping
@@ -43,9 +45,10 @@ public class ClienteController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Obtener detalle de un cliente")
-    public ClienteResponse obtener(@PathVariable Long id) {
-        return clienteService.obtener(id);
+    @Operation(summary = "Obtener detalle de un cliente. Un Asesor Comercial solo puede ver el suyo propio "
+            + "(404 si el cliente no le pertenece).")
+    public ClienteResponse obtener(@PathVariable Long id, @AuthenticationPrincipal JwtPrincipal principal) {
+        return clienteService.obtener(id, principal);
     }
 
     @PutMapping("/{id}")

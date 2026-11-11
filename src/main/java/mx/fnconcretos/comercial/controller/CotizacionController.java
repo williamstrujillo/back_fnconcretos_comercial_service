@@ -34,12 +34,14 @@ public class CotizacionController {
     private final BitacoraService bitacoraService;
 
     @GetMapping
-    @Operation(summary = "Buscar cotizaciones por cliente, estatus o folio (q, coincidencia parcial)")
+    @Operation(summary = "Buscar cotizaciones por cliente, estatus o folio (q, coincidencia parcial). Un Asesor "
+            + "Comercial solo ve las propias.")
     public List<CotizacionResponse> listar(@RequestParam(required = false) Long clienteId,
                                             @RequestParam(required = false) String estatus,
                                             @RequestParam(required = false) String q,
-                                            @RequestParam(required = false) Long plantaId) {
-        return cotizacionService.listar(clienteId, estatus, q, plantaId);
+                                            @RequestParam(required = false) Long plantaId,
+                                            @AuthenticationPrincipal JwtPrincipal principal) {
+        return cotizacionService.listar(clienteId, estatus, q, plantaId, principal);
     }
 
     @PostMapping
@@ -51,9 +53,10 @@ public class CotizacionController {
     }
 
     @GetMapping("/{id}")
-    @Operation(summary = "Obtener detalle de una cotizacion")
-    public CotizacionResponse obtener(@PathVariable Long id) {
-        return cotizacionService.obtener(id);
+    @Operation(summary = "Obtener detalle de una cotizacion. Un Asesor Comercial solo puede ver la suya "
+            + "propia (404 si no le pertenece).")
+    public CotizacionResponse obtener(@PathVariable Long id, @AuthenticationPrincipal JwtPrincipal principal) {
+        return cotizacionService.obtener(id, principal);
     }
 
     @PutMapping("/{id}")

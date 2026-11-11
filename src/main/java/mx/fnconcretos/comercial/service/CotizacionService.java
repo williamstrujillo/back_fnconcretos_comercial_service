@@ -96,7 +96,7 @@ public class CotizacionService {
     private BigDecimal porcentajeForaneo2;
 
     @Transactional(readOnly = true)
-    public List<CotizacionResponse> listar(Long clienteId, String estatus, String q, Long plantaId) {
+    public List<CotizacionResponse> listar(Long clienteId, String estatus, String q, Long plantaId, JwtPrincipal principal) {
         Specification<Cotizacion> spec = Specification.where(null);
 
         if (clienteId != null) {
@@ -112,6 +112,10 @@ public class CotizacionService {
             String like = "%" + q.toLowerCase() + "%";
             spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("folio")), like));
         }
+        if (esAsesorComercial(principal)) {
+            Long miAsesorId = miAsesor(principal).getId();
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("asesor").get("id"), miAsesorId));
+        }
 
         return cotizacionRepository.findAll(spec).stream().map(this::toResponse).toList();
     }
@@ -121,7 +125,17 @@ public class CotizacionService {
         Cliente cliente = clienteService.buscarOFallar(request.getClienteId());
         Obra obra = request.getObraId() != null ? obraService.buscarOFallar(request.getObraId()) : null;
         ContactoCliente contacto = request.getContactoId() != null ? buscarContactoOFallar(request.getContactoId()) : null;
-        AsesorComercial asesor = request.getAsesorId() != null ? asesorService.buscarOFallar(request.getAsesorId()) : null;
+        // Un Asesor Comercial solo puede cotizar para un cliente propio, y la cotizacion siempre
+        // queda a su nombre -- se ignora cualquier asesorId distinto que venga en el request.
+        AsesorComercial asesor;
+        if (esAsesorComercial(principal)) {
+            asesor = miAsesor(principal);
+            if (cliente.getAsesorAsignado() == null || !cliente.getAsesorAsignado().getId().equals(asesor.getId())) {
+                throw new ResourceNotFoundException("Cliente no encontrado: " + request.getClienteId());
+            }
+        } else {
+            asesor = request.getAsesorId() != null ? asesorService.buscarOFallar(request.getAsesorId()) : null;
+        }
 
         BigDecimal descuento = request.getPorcentajeDescuento() != null ? request.getPorcentajeDescuento() : BigDecimal.ZERO;
         validarDescuento(descuento, request.getRequiereFactura(), principal);
@@ -181,8 +195,8 @@ public class CotizacionService {
     }
 
     @Transactional(readOnly = true)
-    public CotizacionResponse obtener(Long id) {
-        return toResponse(buscarOFallar(id));
+    public CotizacionResponse obtener(Long id, JwtPrincipal principal) {
+        return toResponse(buscarPropiaOFallar(id, principal));
     }
 
     /** Usado por catalogo-service antes de borrar un tipo de condicion (unico caso donde ese
@@ -200,7 +214,7 @@ public class CotizacionService {
      */
     @Transactional
     public WhatsAppEnvioResponse enviarWhatsApp(Long id, String bearerToken) {
-        CotizacionResponse cotizacion = obtener(id);
+        CotizacionResponse cotizacion = toResponse(buscarOFallar(id));
         Cliente cliente = clienteService.buscarOFallar(cotizacion.getClienteId());
         if (cliente.getTelefono() == null || cliente.getTelefono().isBlank()) {
             throw new EstadoInvalidoException("El cliente no tiene telefono registrado");
@@ -225,7 +239,7 @@ public class CotizacionService {
 
     @Transactional
     public CotizacionResponse actualizar(Long id, CotizacionRequest request, JwtPrincipal principal, String bearerToken) {
-        Cotizacion cotizacion = buscarOFallar(id);
+        Cotizacion cotizacion = buscarPropiaOFallar(id, principal);
         if ("convertida".equals(cotizacion.getEstatus())) {
             throw new EstadoInvalidoException("No se puede modificar una cotizacion ya convertida a pedido");
         }
@@ -257,11 +271,21 @@ public class CotizacionService {
         BigDecimal iva = calcularIva(subtotal, porcentajeIvaAplicado);
         CondicionesResueltas condiciones = resolverCondiciones(request.getTipoCondicionId(), bearerToken);
 
-        cotizacion.setCliente(clienteService.buscarOFallar(request.getClienteId()));
+        Cliente clienteNuevo = clienteService.buscarOFallar(request.getClienteId());
+        if (esAsesorComercial(principal)) {
+            Long miAsesorId = miAsesor(principal).getId();
+            if (clienteNuevo.getAsesorAsignado() == null || !clienteNuevo.getAsesorAsignado().getId().equals(miAsesorId)) {
+                throw new ResourceNotFoundException("Cliente no encontrado: " + request.getClienteId());
+            }
+        }
+        cotizacion.setCliente(clienteNuevo);
         cotizacion.setObra(obraNueva);
         cotizacion.setContacto(request.getContactoId() != null ? buscarContactoOFallar(request.getContactoId()) : null);
         cotizacion.setPlantaId(request.getPlantaId());
-        cotizacion.setAsesor(request.getAsesorId() != null ? asesorService.buscarOFallar(request.getAsesorId()) : null);
+        // Un Asesor Comercial nunca puede reasignar su cotizacion a otro asesor.
+        if (!esAsesorComercial(principal)) {
+            cotizacion.setAsesor(request.getAsesorId() != null ? asesorService.buscarOFallar(request.getAsesorId()) : null);
+        }
         cotizacion.setVolumenM3(volumenTotal);
         if (request.getTipoServicio() != null) cotizacion.setTipoServicio(request.getTipoServicio());
         cotizacion.setFechaSuministroEstimada(request.getFechaSuministroEstimada());
@@ -297,7 +321,7 @@ public class CotizacionService {
 
     @Transactional
     public CotizacionResponse cambiarEstatus(Long id, EstatusRequest request, JwtPrincipal principal) {
-        Cotizacion cotizacion = buscarOFallar(id);
+        Cotizacion cotizacion = buscarPropiaOFallar(id, principal);
         if ("convertida".equals(cotizacion.getEstatus())) {
             throw new EstadoInvalidoException("No se puede cambiar el estatus de una cotizacion ya convertida a pedido");
         }
@@ -316,7 +340,7 @@ public class CotizacionService {
 
     @Transactional
     public CotizacionResponse duplicar(Long id, JwtPrincipal principal) {
-        Cotizacion origen = buscarOFallar(id);
+        Cotizacion origen = buscarPropiaOFallar(id, principal);
 
         String usuario = principal != null ? principal.user() : null;
         Cotizacion copia = Cotizacion.builder()
@@ -373,7 +397,7 @@ public class CotizacionService {
 
     @Transactional
     public PedidoResponse convertirAPedido(Long id, ConvertirPedidoRequest request, JwtPrincipal principal) {
-        Cotizacion cotizacion = buscarOFallar(id);
+        Cotizacion cotizacion = buscarPropiaOFallar(id, principal);
         if (!"listo".equals(cotizacion.getEstatus())) {
             throw new EstadoInvalidoException("Solo se puede convertir a pedido una cotizacion en estatus 'listo'");
         }
@@ -733,6 +757,30 @@ public class CotizacionService {
     protected Cotizacion buscarOFallar(Long id) {
         return cotizacionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Cotizacion no encontrada: " + id));
+    }
+
+    /** Igual que buscarOFallar, pero valida que la cotizacion sea del Asesor Comercial autenticado
+     * -- 404 (no 403) para no revelar que la cotizacion existe pero es de otro asesor. */
+    private Cotizacion buscarPropiaOFallar(Long id, JwtPrincipal principal) {
+        Cotizacion cotizacion = buscarOFallar(id);
+        if (esAsesorComercial(principal)) {
+            Long miAsesorId = miAsesor(principal).getId();
+            AsesorComercial asesor = cotizacion.getAsesor();
+            if (asesor == null || !asesor.getId().equals(miAsesorId)) {
+                throw new ResourceNotFoundException("Cotizacion no encontrada: " + id);
+            }
+        }
+        return cotizacion;
+    }
+
+    private boolean esAsesorComercial(JwtPrincipal principal) {
+        return principal != null && "Asesor Comercial".equals(principal.rol());
+    }
+
+    private AsesorComercial miAsesor(JwtPrincipal principal) {
+        return asesorService.buscarPorUsuarioId(principal.usuarioId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "El usuario " + principal.usuarioId() + " no tiene un asesor comercial asociado"));
     }
 
     private ContactoCliente buscarContactoOFallar(Long id) {
