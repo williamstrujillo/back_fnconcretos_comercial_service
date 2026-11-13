@@ -96,8 +96,10 @@ public class CotizacionController {
     }
 
     @GetMapping("/{id}/bitacora")
-    @Operation(summary = "Historial completo de acciones sobre la cotizacion (quien y cuando), en orden mas reciente primero")
-    public List<BitacoraEventoResponse> bitacora(@PathVariable Long id) {
+    @Operation(summary = "Historial completo de acciones sobre la cotizacion (quien y cuando), en orden mas reciente "
+            + "primero. Un Asesor Comercial solo puede verla si la cotizacion es suya (404 si no).")
+    public List<BitacoraEventoResponse> bitacora(@PathVariable Long id, @AuthenticationPrincipal JwtPrincipal principal) {
+        cotizacionService.obtener(id, principal);
         return bitacoraService.listar("cotizacion", id);
     }
 

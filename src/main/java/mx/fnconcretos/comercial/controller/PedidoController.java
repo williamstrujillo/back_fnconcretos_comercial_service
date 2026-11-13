@@ -43,8 +43,9 @@ public class PedidoController {
                                         @RequestParam(required = false) Long plantaId,
                                         @RequestParam(required = false) Long asesorId,
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
-                                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
-        return pedidoService.listar(clienteId, estatusGeneral, q, plantaId, asesorId, desde, hasta);
+                                        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+                                        @AuthenticationPrincipal JwtPrincipal principal) {
+        return pedidoService.listar(clienteId, estatusGeneral, q, plantaId, asesorId, desde, hasta, principal);
     }
 
     @GetMapping("/{id}")
