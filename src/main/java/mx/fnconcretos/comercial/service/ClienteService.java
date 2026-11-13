@@ -209,8 +209,8 @@ public class ClienteService {
      * antes de llegar siquiera al try/catch de abajo. buscarOFallar() ya corre en su propia
      * transaccion implicita de Spring Data, no necesita una envolvente.
      */
-    public EstadoCuentaResponse estadoCuenta(Long id, String bearerToken) {
-        buscarOFallar(id);
+    public EstadoCuentaResponse estadoCuenta(Long id, String bearerToken, JwtPrincipal principal) {
+        buscarPropioOFallar(id, principal);
         try {
             FinanzasClient.EstadoCuentaClienteInfo info = finanzasClient.obtenerEstadoCuenta(id, bearerToken);
             return EstadoCuentaResponse.builder()
@@ -281,7 +281,7 @@ public class ClienteService {
     /** Igual que buscarOFallar, pero ademas valida que el cliente le pertenezca cuando quien pide
      * es un Asesor Comercial -- 404 (no 403) para no revelar que el cliente existe pero es de
      * otro asesor. El modelo ya tenia Cliente.asesorAsignado; antes nada en el backend lo exigia. */
-    private Cliente buscarPropioOFallar(Long id, JwtPrincipal principal) {
+    protected Cliente buscarPropioOFallar(Long id, JwtPrincipal principal) {
         Cliente cliente = buscarOFallar(id);
         if (esAsesorComercial(principal)) {
             Long miAsesorId = miAsesor(principal).getId();

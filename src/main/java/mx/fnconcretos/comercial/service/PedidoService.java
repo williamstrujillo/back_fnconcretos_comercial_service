@@ -21,6 +21,8 @@ import mx.fnconcretos.comercial.entity.PedidoAutorizacion;
 import mx.fnconcretos.comercial.entity.PedidoDetalle;
 import mx.fnconcretos.comercial.exception.EstadoInvalidoException;
 import mx.fnconcretos.comercial.exception.ResourceNotFoundException;
+import mx.fnconcretos.comercial.entity.AsesorComercial;
+import mx.fnconcretos.comercial.repository.AsesorComercialRepository;
 import mx.fnconcretos.comercial.repository.PedidoAutorizacionRepository;
 import mx.fnconcretos.comercial.repository.PedidoDetalleRepository;
 import mx.fnconcretos.comercial.repository.PedidoRepository;
@@ -57,14 +59,15 @@ public class PedidoService {
     private final OperacionesClient operacionesClient;
     private final FinanzasClient finanzasClient;
     private final BitacoraService bitacoraService;
+    private final AsesorComercialRepository asesorRepository;
 
     @Transactional(readOnly = true)
-    public List<PedidoResponse> listar(Long clienteId, String estatusGeneral, String q, Long plantaId, Long asesorId) {
-        return listar(clienteId, estatusGeneral, q, plantaId, asesorId, null, null);
+    public List<PedidoResponse> listar(Long clienteId, String estatusGeneral, String q, Long plantaId, Long asesorId, JwtPrincipal principal) {
+        return listar(clienteId, estatusGeneral, q, plantaId, asesorId, null, null, principal);
     }
 
     public List<PedidoResponse> listar(Long clienteId, String estatusGeneral, String q, Long plantaId, Long asesorId,
-                                        LocalDate desde, LocalDate hasta) {
+                                        LocalDate desde, LocalDate hasta, JwtPrincipal principal) {
         Specification<Pedido> spec = Specification.where(null);
 
         if (clienteId != null) {
@@ -73,7 +76,14 @@ public class PedidoService {
         if (plantaId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("plantaId"), plantaId));
         }
-        if (asesorId != null) {
+        // Un Asesor Comercial solo ve sus propios pedidos -- se ignora cualquier asesorId distinto
+        // que venga en el query string (hallazgo real 2026-11-13, §comercial/finanzas: GET
+        // /pedidos?clienteId= de un cliente ajeno regresaba 200 con los pedidos reales de ese
+        // cliente sin filtrar por asesor en absoluto, no solo "200 []" como parecio en la prueba).
+        if (esAsesorComercial(principal)) {
+            Long miAsesorId = miAsesor(principal).getId();
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("asesor").get("id"), miAsesorId));
+        } else if (asesorId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("asesor").get("id"), asesorId));
         }
         if (estatusGeneral != null && !estatusGeneral.isBlank()) {
@@ -369,6 +379,16 @@ public class PedidoService {
     protected Pedido buscarOFallar(Long id) {
         return pedidoRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pedido no encontrado: " + id));
+    }
+
+    private boolean esAsesorComercial(JwtPrincipal principal) {
+        return principal != null && "Asesor Comercial".equals(principal.rol());
+    }
+
+    private AsesorComercial miAsesor(JwtPrincipal principal) {
+        return asesorRepository.findByUsuarioId(principal.usuarioId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "El usuario " + principal.usuarioId() + " no tiene un asesor comercial asociado"));
     }
 
     private AutorizacionResponse toAutorizacionResponse(PedidoAutorizacion autorizacion) {

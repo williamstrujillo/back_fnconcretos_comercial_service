@@ -761,7 +761,7 @@ public class CotizacionService {
 
     /** Igual que buscarOFallar, pero valida que la cotizacion sea del Asesor Comercial autenticado
      * -- 404 (no 403) para no revelar que la cotizacion existe pero es de otro asesor. */
-    private Cotizacion buscarPropiaOFallar(Long id, JwtPrincipal principal) {
+    protected Cotizacion buscarPropiaOFallar(Long id, JwtPrincipal principal) {
         Cotizacion cotizacion = buscarOFallar(id);
         if (esAsesorComercial(principal)) {
             Long miAsesorId = miAsesor(principal).getId();

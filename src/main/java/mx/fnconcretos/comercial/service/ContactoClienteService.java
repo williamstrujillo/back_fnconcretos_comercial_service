@@ -7,6 +7,7 @@ import mx.fnconcretos.comercial.entity.Cliente;
 import mx.fnconcretos.comercial.entity.ContactoCliente;
 import mx.fnconcretos.comercial.exception.ResourceNotFoundException;
 import mx.fnconcretos.comercial.repository.ContactoClienteRepository;
+import mx.fnconcretos.comercial.security.JwtPrincipal;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,14 +21,14 @@ public class ContactoClienteService {
     private final ClienteService clienteService;
 
     @Transactional(readOnly = true)
-    public List<ContactoResponse> listarPorCliente(Long clienteId) {
-        clienteService.buscarOFallar(clienteId);
+    public List<ContactoResponse> listarPorCliente(Long clienteId, JwtPrincipal principal) {
+        clienteService.buscarPropioOFallar(clienteId, principal);
         return contactoRepository.findByClienteId(clienteId).stream().map(this::toResponse).toList();
     }
 
     @Transactional
-    public ContactoResponse crear(Long clienteId, ContactoRequest request) {
-        Cliente cliente = clienteService.buscarOFallar(clienteId);
+    public ContactoResponse crear(Long clienteId, ContactoRequest request, JwtPrincipal principal) {
+        Cliente cliente = clienteService.buscarPropioOFallar(clienteId, principal);
 
         ContactoCliente contacto = ContactoCliente.builder()
                 .cliente(cliente)
@@ -43,7 +44,8 @@ public class ContactoClienteService {
     }
 
     @Transactional
-    public ContactoResponse actualizar(Long clienteId, Long contactoId, ContactoRequest request) {
+    public ContactoResponse actualizar(Long clienteId, Long contactoId, ContactoRequest request, JwtPrincipal principal) {
+        clienteService.buscarPropioOFallar(clienteId, principal);
         ContactoCliente contacto = buscarOFallar(clienteId, contactoId);
 
         contacto.setNombre(request.getNombre());
@@ -57,7 +59,8 @@ public class ContactoClienteService {
     }
 
     @Transactional
-    public void eliminar(Long clienteId, Long contactoId) {
+    public void eliminar(Long clienteId, Long contactoId, JwtPrincipal principal) {
+        clienteService.buscarPropioOFallar(clienteId, principal);
         ContactoCliente contacto = buscarOFallar(clienteId, contactoId);
         contactoRepository.delete(contacto);
     }

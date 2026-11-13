@@ -66,9 +66,11 @@ public class ClienteController {
     }
 
     @GetMapping("/{id}/estado-cuenta")
-    @Operation(summary = "Estado de cuenta del cliente (proxy hacia finanzas-service)")
-    public EstadoCuentaResponse estadoCuenta(@PathVariable Long id, @RequestHeader(HttpHeaders.AUTHORIZATION) String bearerToken) {
-        return clienteService.estadoCuenta(id, bearerToken);
+    @Operation(summary = "Estado de cuenta del cliente (proxy hacia finanzas-service). Un Asesor Comercial "
+            + "solo puede verlo si el cliente es suyo (404 si no).")
+    public EstadoCuentaResponse estadoCuenta(@PathVariable Long id, @RequestHeader(HttpHeaders.AUTHORIZATION) String bearerToken,
+                                              @AuthenticationPrincipal JwtPrincipal principal) {
+        return clienteService.estadoCuenta(id, bearerToken, principal);
     }
 
     @GetMapping("/estado-cuenta/batch")
