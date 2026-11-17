@@ -18,6 +18,10 @@ public class ClienteResponse {
     private String nombre;
     private String tipo;
     private String rfc;
+    private String razonSocial;
+    private String codigoPostal;
+    private String regimenFiscal;
+    private String usoCfdiPreferido;
     private String telefono;
     private Boolean whatsappDisponible;
     private String correo;

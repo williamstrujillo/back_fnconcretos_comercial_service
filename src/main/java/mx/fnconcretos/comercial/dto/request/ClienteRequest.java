@@ -22,6 +22,14 @@ public class ClienteRequest {
     private String tipo;
 
     private String rfc;
+
+    /** Nombre/razon social EXACTO ante el SAT. codigoPostal/regimenFiscal/usoCfdiPreferido son las
+     * claves del SAT necesarias para timbrar CFDI 4.0 -- ver Cliente.java. */
+    private String razonSocial;
+    private String codigoPostal;
+    private String regimenFiscal;
+    private String usoCfdiPreferido;
+
     private String telefono;
     private Boolean whatsappDisponible;
     private String correo;

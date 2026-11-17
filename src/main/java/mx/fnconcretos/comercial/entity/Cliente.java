@@ -43,6 +43,24 @@ public class Cliente {
     @Column(name = "rfc", length = 20)
     private String rfc;
 
+    /** Nombre o razon social EXACTO como esta registrado ante el SAT -- puede diferir de "nombre"
+     * (que es el nombre comercial/para mostrar). Requerido junto con codigoPostal/regimenFiscal/
+     * usoCfdiPreferido para timbrar un CFDI 4.0 valido; null si todavia no se capturan estos datos. */
+    @Column(name = "razon_social", length = 150)
+    private String razonSocial;
+
+    /** C.P. del domicilio fiscal (SAT exige que coincida con el que tiene registrado el RFC). */
+    @Column(name = "codigo_postal", length = 5)
+    private String codigoPostal;
+
+    /** Clave del catalogo c_RegimenFiscal del SAT (ej. 601, 612, 626, 616 "Sin obligaciones fiscales"). */
+    @Column(name = "regimen_fiscal", length = 10)
+    private String regimenFiscal;
+
+    /** Clave del catalogo c_UsoCFDI del SAT (ej. CP01, G03, S01 "Sin efectos fiscales"). */
+    @Column(name = "uso_cfdi_preferido", length = 10)
+    private String usoCfdiPreferido;
+
     @Column(name = "telefono", length = 20)
     private String telefono;
 

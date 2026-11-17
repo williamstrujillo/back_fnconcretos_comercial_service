@@ -79,6 +79,10 @@ public class ClienteService {
                 .nombre(request.getNombre())
                 .tipo(request.getTipo() != null ? request.getTipo() : "particular")
                 .rfc(request.getRfc())
+                .razonSocial(request.getRazonSocial())
+                .codigoPostal(request.getCodigoPostal())
+                .regimenFiscal(request.getRegimenFiscal())
+                .usoCfdiPreferido(request.getUsoCfdiPreferido())
                 .telefono(request.getTelefono())
                 .whatsappDisponible(request.getWhatsappDisponible() != null ? request.getWhatsappDisponible() : false)
                 .correo(request.getCorreo())
@@ -125,6 +129,10 @@ public class ClienteService {
         cliente.setNombre(request.getNombre());
         if (request.getTipo() != null) cliente.setTipo(request.getTipo());
         cliente.setRfc(request.getRfc());
+        cliente.setRazonSocial(request.getRazonSocial());
+        cliente.setCodigoPostal(request.getCodigoPostal());
+        cliente.setRegimenFiscal(request.getRegimenFiscal());
+        cliente.setUsoCfdiPreferido(request.getUsoCfdiPreferido());
         cliente.setTelefono(request.getTelefono());
         if (request.getWhatsappDisponible() != null) cliente.setWhatsappDisponible(request.getWhatsappDisponible());
         cliente.setCorreo(request.getCorreo());
@@ -316,6 +324,10 @@ public class ClienteService {
                 .nombre(cliente.getNombre())
                 .tipo(cliente.getTipo())
                 .rfc(cliente.getRfc())
+                .razonSocial(cliente.getRazonSocial())
+                .codigoPostal(cliente.getCodigoPostal())
+                .regimenFiscal(cliente.getRegimenFiscal())
+                .usoCfdiPreferido(cliente.getUsoCfdiPreferido())
                 .telefono(cliente.getTelefono())
                 .whatsappDisponible(cliente.getWhatsappDisponible())
                 .correo(cliente.getCorreo())
