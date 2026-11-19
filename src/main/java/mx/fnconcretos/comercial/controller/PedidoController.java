@@ -36,7 +36,8 @@ public class PedidoController {
 
     @GetMapping
     @Operation(summary = "Buscar pedidos por cliente, planta, asesor, estatus general o folio (q, coincidencia parcial). "
-            + "desde/hasta filtran por fechaProgramada (para el informe de pedidos y ventas por periodo de Direccion).")
+            + "desde/hasta filtran por fechaProgramada (para el informe de pedidos y ventas por periodo de Direccion). "
+            + "tipoServicio (directo|bomba) para encontrar pedidos de renta/bombeo, ej. al dar de alta un arrendamiento de bomba.")
     public List<PedidoResponse> listar(@RequestParam(required = false) Long clienteId,
                                         @RequestParam(required = false) String estatusGeneral,
                                         @RequestParam(required = false) String q,
@@ -44,8 +45,9 @@ public class PedidoController {
                                         @RequestParam(required = false) Long asesorId,
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
                                         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
+                                        @RequestParam(required = false) String tipoServicio,
                                         @AuthenticationPrincipal JwtPrincipal principal) {
-        return pedidoService.listar(clienteId, estatusGeneral, q, plantaId, asesorId, desde, hasta, principal);
+        return pedidoService.listar(clienteId, estatusGeneral, q, plantaId, asesorId, desde, hasta, tipoServicio, principal);
     }
 
     @GetMapping("/{id}")
