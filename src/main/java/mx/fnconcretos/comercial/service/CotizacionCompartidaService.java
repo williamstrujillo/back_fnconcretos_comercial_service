@@ -131,7 +131,12 @@ public class CotizacionCompartidaService {
     }
 
     private CotizacionPublicaResponse.ClienteInfo construirCliente(Cotizacion cotizacion) {
-        if (cotizacion.getCliente() == null) return null;
+        if (cotizacion.getCliente() == null) {
+            // Cotizacion simple (cliente sin registrar todavia) -- solo el nombre en texto libre,
+            // sin telefono/rfc (no existen todavia).
+            if (cotizacion.getClienteNombreLibre() == null) return null;
+            return CotizacionPublicaResponse.ClienteInfo.builder().nombre(cotizacion.getClienteNombreLibre()).build();
+        }
         return CotizacionPublicaResponse.ClienteInfo.builder()
                 .nombre(cotizacion.getCliente().getNombre())
                 .telefono(cotizacion.getCliente().getTelefono())

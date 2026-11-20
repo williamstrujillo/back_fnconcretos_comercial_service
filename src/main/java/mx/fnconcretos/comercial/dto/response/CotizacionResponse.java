@@ -21,8 +21,10 @@ public class CotizacionResponse {
     private String folio;
     private Long clienteId;
     private String clienteNombre;
+    private String clienteNombreLibre;
     private Long obraId;
     private String obraNombre;
+    private String obraNombreLibre;
     private Long contactoId;
     private Long plantaId;
     private Long asesorId;
