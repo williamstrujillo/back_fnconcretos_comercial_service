@@ -457,6 +457,7 @@ public class PedidoService {
                 .id(linea.getId())
                 .tipoLinea(linea.getTipoLinea())
                 .productoId(linea.getProductoId())
+                .servicioBombeoId(linea.getServicioBombeoId())
                 .volumenSolicitadoM3(linea.getVolumenSolicitadoM3())
                 .volumenEntregadoM3(linea.getVolumenEntregadoM3())
                 .volumenPendienteM3(linea.getVolumenPendienteM3())

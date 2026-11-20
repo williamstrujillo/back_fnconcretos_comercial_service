@@ -24,6 +24,9 @@ public class CotizacionItemRequest {
     /** Obligatorio solo si tipoLinea=producto */
     private Long productoId;
 
+    /** Servicio de bombeo en catalogo-service; solo aplica si tipoLinea=bombeo, opcional */
+    private Long servicioBombeoId;
+
     /**
      * Obligatorio si tipoLinea=producto/otro. Para tipoLinea=bombeo es opcional:
      * si se omite, se autocompleta con la suma del volumen de las lineas de producto.
