@@ -5,11 +5,13 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import mx.fnconcretos.comercial.client.GoogleMapsClient;
 import mx.fnconcretos.comercial.dto.request.EstatusRequest;
 import mx.fnconcretos.comercial.dto.request.ObraRequest;
 import mx.fnconcretos.comercial.dto.request.VincularClienteRequest;
 import mx.fnconcretos.comercial.dto.response.ClienteObraResponse;
 import mx.fnconcretos.comercial.dto.response.ObraResponse;
+import mx.fnconcretos.comercial.dto.response.UbicacionResueltaResponse;
 import mx.fnconcretos.comercial.security.JwtPrincipal;
 import mx.fnconcretos.comercial.service.ObraService;
 import org.springframework.http.HttpStatus;
@@ -26,6 +28,18 @@ import java.util.List;
 public class ObraController {
 
     private final ObraService obraService;
+    private final GoogleMapsClient googleMapsClient;
+
+    @GetMapping("/resolver-ubicacion")
+    @Operation(summary = "Resuelve un link de Google Maps (corto o largo) a coordenadas + direccion/ciudad/colonia",
+            description = "Si el link ya trae coordenadas en el texto las usa directo (gratis); si es un link corto "
+                    + "sigue la redireccion. Para direccion/ciudad/colonia siempre hace falta geocodificar (Google "
+                    + "Geocoding API, se factura) -- esa parte viene null si falta la key o si falla, nunca bloquea nada. "
+                    + "200 con todo null si no se pudieron obtener coordenadas de ninguna forma.")
+    public UbicacionResueltaResponse resolverUbicacion(@RequestParam String link) {
+        UbicacionResueltaResponse resuelta = googleMapsClient.resolverUbicacionDesdeLink(link);
+        return resuelta != null ? resuelta : UbicacionResueltaResponse.builder().usoApiGoogle(false).build();
+    }
 
     @GetMapping
     @Operation(summary = "Buscar obras por estatus, ciudad o nombre. Un Asesor Comercial solo ve las obras de "
