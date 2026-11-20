@@ -6,7 +6,10 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import mx.fnconcretos.comercial.client.FinanzasClient;
+
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * Proxy hacia finanzas-service (ClienteEstadoCuentaController, donde vive Pago). Si esa llamada
@@ -37,4 +40,12 @@ public class EstadoCuentaResponse {
     private boolean moroso = false;
 
     private String mensaje;
+
+    // --- Antiguedad de saldos (dashboard de cartera/morosos) ---
+    private Integer diasVencidoMax;
+    private BigDecimal rango0a30;
+    private BigDecimal rango31a60;
+    private BigDecimal rango61a90;
+    private BigDecimal rango90mas;
+    private List<FinanzasClient.PedidoVencidoInfo> pedidosVencidos;
 }
