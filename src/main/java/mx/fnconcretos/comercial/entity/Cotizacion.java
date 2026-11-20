@@ -35,13 +35,25 @@ public class Cotizacion {
     @Column(name = "folio", nullable = false, unique = true, length = 30)
     private String folio;
 
+    /** Null en una cotizacion "simple" (prospecto sin registrar todavia) -- en ese caso
+     * clienteNombreLibre trae el nombre en texto. No se puede convertir a pedido hasta vincular un
+     * cliente real (ver CotizacionService.convertirAPedido). */
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "cliente_id", nullable = false)
+    @JoinColumn(name = "cliente_id")
     private Cliente cliente;
+
+    /** Solo se usa cuando cliente es null (cotizacion simple). */
+    @Column(name = "cliente_nombre_libre", length = 150)
+    private String clienteNombreLibre;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "obra_id")
     private Obra obra;
+
+    /** Solo se usa cuando obra es null -- aplica tanto a cotizacion simple como a una con cliente
+     * real que todavia no tiene la obra dada de alta en el catalogo. */
+    @Column(name = "obra_nombre_libre", length = 150)
+    private String obraNombreLibre;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "contacto_id")

@@ -19,10 +19,20 @@ import java.util.List;
 @AllArgsConstructor
 public class CotizacionRequest {
 
-    @NotNull(message = "clienteId es obligatorio")
+    /** clienteId o clienteNombreLibre: uno de los dos es obligatorio (validado en el service, no
+     * aqui, porque la regla es "uno u otro" y Bean Validation no expresa eso limpio entre 2 campos). */
     private Long clienteId;
 
+    /** Solo para cotizacion simple (sin clienteId) -- nombre del prospecto en texto libre. */
+    @Size(max = 150, message = "clienteNombreLibre debe tener maximo 150 caracteres")
+    private String clienteNombreLibre;
+
     private Long obraId;
+
+    /** Solo cuando no se manda obraId -- nombre de la obra en texto libre. */
+    @Size(max = 150, message = "obraNombreLibre debe tener maximo 150 caracteres")
+    private String obraNombreLibre;
+
     private Long contactoId;
 
     /** Obligatorio: de aqui se toma la tarifa de flete por vacio (capacidadReferenciaM3/precioPorM3Vacio). */

@@ -122,15 +122,22 @@ public class CotizacionService {
 
     @Transactional
     public CotizacionResponse crear(CotizacionRequest request, JwtPrincipal principal, String bearerToken) {
-        Cliente cliente = clienteService.buscarOFallar(request.getClienteId());
+        if (request.getClienteId() == null && (request.getClienteNombreLibre() == null || request.getClienteNombreLibre().isBlank())) {
+            throw new IllegalArgumentException("Indica un cliente registrado (clienteId) o al menos su nombre (clienteNombreLibre)");
+        }
+        // Cotizacion simple (prospecto sin registrar todavia): clienteId null, solo el nombre en
+        // texto libre. No se puede convertir a pedido hasta que se vincule un cliente real (ver
+        // convertirAPedido) -- la obra tambien queda solo en texto en ese caso.
+        Cliente cliente = request.getClienteId() != null ? clienteService.buscarOFallar(request.getClienteId()) : null;
         Obra obra = request.getObraId() != null ? obraService.buscarOFallar(request.getObraId()) : null;
         ContactoCliente contacto = request.getContactoId() != null ? buscarContactoOFallar(request.getContactoId()) : null;
         // Un Asesor Comercial solo puede cotizar para un cliente propio, y la cotizacion siempre
-        // queda a su nombre -- se ignora cualquier asesorId distinto que venga en el request.
+        // queda a su nombre -- se ignora cualquier asesorId distinto que venga en el request. Con
+        // cotizacion simple (cliente null, prospecto nuevo) no aplica esa validacion de propiedad.
         AsesorComercial asesor;
         if (esAsesorComercial(principal)) {
             asesor = miAsesor(principal);
-            if (cliente.getAsesorAsignado() == null || !cliente.getAsesorAsignado().getId().equals(asesor.getId())) {
+            if (cliente != null && (cliente.getAsesorAsignado() == null || !cliente.getAsesorAsignado().getId().equals(asesor.getId()))) {
                 throw new ResourceNotFoundException("Cliente no encontrado: " + request.getClienteId());
             }
         } else {
@@ -156,7 +163,9 @@ public class CotizacionService {
         Cotizacion cotizacion = Cotizacion.builder()
                 .folio(generarFolio())
                 .cliente(cliente)
+                .clienteNombreLibre(cliente == null ? request.getClienteNombreLibre().trim() : null)
                 .obra(obra)
+                .obraNombreLibre(obra == null && request.getObraNombreLibre() != null ? request.getObraNombreLibre().trim() : null)
                 .contacto(contacto)
                 .plantaId(request.getPlantaId())
                 .asesor(asesor)
@@ -215,6 +224,9 @@ public class CotizacionService {
     @Transactional
     public WhatsAppEnvioResponse enviarWhatsApp(Long id, String bearerToken) {
         CotizacionResponse cotizacion = toResponse(buscarOFallar(id));
+        if (cotizacion.getClienteId() == null) {
+            throw new EstadoInvalidoException("Esta cotizacion es simple (cliente sin registrar todavia) -- da de alta al cliente real y vinculalo antes de mandarle WhatsApp");
+        }
         Cliente cliente = clienteService.buscarOFallar(cotizacion.getClienteId());
         if (cliente.getTelefono() == null || cliente.getTelefono().isBlank()) {
             throw new EstadoInvalidoException("El cliente no tiene telefono registrado");
@@ -271,15 +283,22 @@ public class CotizacionService {
         BigDecimal iva = calcularIva(subtotal, porcentajeIvaAplicado);
         CondicionesResueltas condiciones = resolverCondiciones(request.getTipoCondicionId(), bearerToken);
 
-        Cliente clienteNuevo = clienteService.buscarOFallar(request.getClienteId());
-        if (esAsesorComercial(principal)) {
+        if (request.getClienteId() == null && (request.getClienteNombreLibre() == null || request.getClienteNombreLibre().isBlank())) {
+            throw new IllegalArgumentException("Indica un cliente registrado (clienteId) o al menos su nombre (clienteNombreLibre)");
+        }
+        // Mandar clienteId aqui es tambien como se "formaliza" una cotizacion simple (vincula un
+        // cliente real por primera vez) -- requisito para poder convertirla a pedido despues.
+        Cliente clienteNuevo = request.getClienteId() != null ? clienteService.buscarOFallar(request.getClienteId()) : null;
+        if (clienteNuevo != null && esAsesorComercial(principal)) {
             Long miAsesorId = miAsesor(principal).getId();
             if (clienteNuevo.getAsesorAsignado() == null || !clienteNuevo.getAsesorAsignado().getId().equals(miAsesorId)) {
                 throw new ResourceNotFoundException("Cliente no encontrado: " + request.getClienteId());
             }
         }
         cotizacion.setCliente(clienteNuevo);
+        cotizacion.setClienteNombreLibre(clienteNuevo == null ? request.getClienteNombreLibre().trim() : null);
         cotizacion.setObra(obraNueva);
+        cotizacion.setObraNombreLibre(obraNueva == null && request.getObraNombreLibre() != null ? request.getObraNombreLibre().trim() : null);
         cotizacion.setContacto(request.getContactoId() != null ? buscarContactoOFallar(request.getContactoId()) : null);
         cotizacion.setPlantaId(request.getPlantaId());
         // Un Asesor Comercial nunca puede reasignar su cotizacion a otro asesor.
@@ -346,7 +365,9 @@ public class CotizacionService {
         Cotizacion copia = Cotizacion.builder()
                 .folio(generarFolio())
                 .cliente(origen.getCliente())
+                .clienteNombreLibre(origen.getClienteNombreLibre())
                 .obra(origen.getObra())
+                .obraNombreLibre(origen.getObraNombreLibre())
                 .contacto(origen.getContacto())
                 .plantaId(origen.getPlantaId())
                 .asesor(origen.getAsesor())
@@ -400,6 +421,10 @@ public class CotizacionService {
         Cotizacion cotizacion = buscarPropiaOFallar(id, principal);
         if (!"listo".equals(cotizacion.getEstatus())) {
             throw new EstadoInvalidoException("Solo se puede convertir a pedido una cotizacion en estatus 'listo'");
+        }
+        if (cotizacion.getCliente() == null) {
+            throw new EstadoInvalidoException("Esta cotizacion es simple (cliente \"" + cotizacion.getClienteNombreLibre()
+                    + "\" sin registrar todavia) -- da de alta al cliente real y vinculalo (editar la cotizacion con su clienteId) antes de convertir a pedido");
         }
 
         List<CotizacionDetalle> lineasCotizacion = cotizacionDetalleRepository.findByCotizacionId(cotizacion.getId());
@@ -792,10 +817,12 @@ public class CotizacionService {
         return CotizacionResponse.builder()
                 .id(cotizacion.getId())
                 .folio(cotizacion.getFolio())
-                .clienteId(cotizacion.getCliente().getId())
-                .clienteNombre(cotizacion.getCliente().getNombre())
+                .clienteId(cotizacion.getCliente() != null ? cotizacion.getCliente().getId() : null)
+                .clienteNombre(cotizacion.getCliente() != null ? cotizacion.getCliente().getNombre() : cotizacion.getClienteNombreLibre())
+                .clienteNombreLibre(cotizacion.getClienteNombreLibre())
                 .obraId(cotizacion.getObra() != null ? cotizacion.getObra().getId() : null)
-                .obraNombre(cotizacion.getObra() != null ? cotizacion.getObra().getNombre() : null)
+                .obraNombre(cotizacion.getObra() != null ? cotizacion.getObra().getNombre() : cotizacion.getObraNombreLibre())
+                .obraNombreLibre(cotizacion.getObraNombreLibre())
                 .contactoId(cotizacion.getContacto() != null ? cotizacion.getContacto().getId() : null)
                 .plantaId(cotizacion.getPlantaId())
                 .asesorId(cotizacion.getAsesor() != null ? cotizacion.getAsesor().getId() : null)
