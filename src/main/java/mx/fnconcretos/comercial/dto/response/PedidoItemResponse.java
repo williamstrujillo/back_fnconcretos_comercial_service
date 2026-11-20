@@ -16,6 +16,7 @@ public class PedidoItemResponse {
     private Long id;
     private String tipoLinea;
     private Long productoId;
+    private Long servicioBombeoId;
     private BigDecimal volumenSolicitadoM3;
     private BigDecimal volumenEntregadoM3;
     private BigDecimal volumenPendienteM3;

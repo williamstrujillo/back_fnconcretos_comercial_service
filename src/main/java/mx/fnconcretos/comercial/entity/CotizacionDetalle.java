@@ -36,6 +36,10 @@ public class CotizacionDetalle {
     @Column(name = "producto_id")
     private Long productoId;
 
+    /** Servicio de bombeo en catalogo-service; solo aplica cuando tipoLinea=bombeo */
+    @Column(name = "servicio_bombeo_id")
+    private Long servicioBombeoId;
+
     /** producto, bombeo, flete_vacio, otro */
     @Column(name = "tipo_linea", nullable = false, length = 20)
     @Builder.Default

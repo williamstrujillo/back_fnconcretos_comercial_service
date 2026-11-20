@@ -16,6 +16,7 @@ public class CotizacionItemResponse {
     private Long id;
     private String tipoLinea;
     private Long productoId;
+    private Long servicioBombeoId;
     private BigDecimal volumenM3;
     @Schema(description = "Precio de catalogo, antes del recargo foraneo -- igual a precioUnitario en "
             + "lineas que no son tipoLinea=producto (nunca llevan recargo).")
