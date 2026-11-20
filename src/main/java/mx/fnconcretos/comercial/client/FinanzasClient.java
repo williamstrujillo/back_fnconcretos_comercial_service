@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -71,5 +73,26 @@ public class FinanzasClient {
         private BigDecimal anticiposDisponibles;
         private boolean moroso;
         private String mensaje;
+
+        // --- Antiguedad de saldos (dashboard de cartera/morosos) ---
+        private Integer diasVencidoMax;
+        private BigDecimal rango0a30;
+        private BigDecimal rango31a60;
+        private BigDecimal rango61a90;
+        private BigDecimal rango90mas;
+        private List<PedidoVencidoInfo> pedidosVencidos;
+    }
+
+    /** Subconjunto de SaldoPedidoResponse (finanzas-service) -- solo lo que el dashboard de cartera
+     * necesita para mostrar el detalle de cada pedido vencido. */
+    @Data
+    public static class PedidoVencidoInfo {
+        private Long pedidoId;
+        private String folio;
+        private LocalDateTime fecha;
+        private String estatusGeneral;
+        private String condicionPago;
+        private BigDecimal montoPendiente;
+        private LocalDate fechaVencimientoCredito;
     }
 }

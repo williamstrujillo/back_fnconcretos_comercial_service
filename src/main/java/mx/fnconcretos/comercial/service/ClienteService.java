@@ -228,6 +228,12 @@ public class ClienteService {
                     .adeudoVencido(info.getAdeudoVencido())
                     .anticiposDisponibles(info.getAnticiposDisponibles())
                     .moroso(info.isMoroso())
+                    .diasVencidoMax(info.getDiasVencidoMax())
+                    .rango0a30(info.getRango0a30())
+                    .rango31a60(info.getRango31a60())
+                    .rango61a90(info.getRango61a90())
+                    .rango90mas(info.getRango90mas())
+                    .pedidosVencidos(info.getPedidosVencidos())
                     .build();
         } catch (Exception e) {
             log.warn("No se pudo obtener el estado de cuenta del cliente {} desde finanzas-service: {}", id, e.getMessage());
@@ -266,6 +272,12 @@ public class ClienteService {
                                 .adeudoVencido(info.getAdeudoVencido())
                                 .anticiposDisponibles(info.getAnticiposDisponibles())
                                 .moroso(info.isMoroso())
+                                .diasVencidoMax(info.getDiasVencidoMax())
+                                .rango0a30(info.getRango0a30())
+                                .rango31a60(info.getRango31a60())
+                                .rango61a90(info.getRango61a90())
+                                .rango90mas(info.getRango90mas())
+                                .pedidosVencidos(info.getPedidosVencidos())
                                 .build();
                     })
                     .toList();
