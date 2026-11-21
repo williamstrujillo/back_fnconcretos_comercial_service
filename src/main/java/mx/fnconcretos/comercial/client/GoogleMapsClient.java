@@ -1,5 +1,6 @@
 package mx.fnconcretos.comercial.client;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import mx.fnconcretos.comercial.dto.response.UbicacionResueltaResponse;
@@ -216,12 +217,19 @@ public class GoogleMapsClient {
 
     @Data
     public static class GeocodeResult {
+        // Google regresa estos campos en snake_case (a diferencia de Routes API, que usa
+        // camelCase) -- sin @JsonProperty, Jackson los deja en null en silencio (bug real
+        // encontrado en vivo 2026-11-21: direccion/ciudad/colonia siempre null pese a que la
+        // API respondia status=OK con datos reales).
+        @JsonProperty("formatted_address")
         private String formattedAddress;
+        @JsonProperty("address_components")
         private List<AddressComponent> addressComponents;
     }
 
     @Data
     public static class AddressComponent {
+        @JsonProperty("long_name")
         private String longName;
         private List<String> types;
     }
