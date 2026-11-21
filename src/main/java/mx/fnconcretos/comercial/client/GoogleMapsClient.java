@@ -33,6 +33,11 @@ public class GoogleMapsClient {
     private static final Pattern PATRON_ARROBA = Pattern.compile("@(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)");
     private static final Pattern PATRON_QUERY = Pattern.compile("[?&]q=(-?\\d+\\.\\d+),(-?\\d+\\.\\d+)");
     private static final Pattern PATRON_CRUDO = Pattern.compile("^\\s*(-?\\d+\\.\\d+)\\s*,\\s*(-?\\d+\\.\\d+)\\s*$");
+    /** Formato "/maps/place/.../data=...!3d<lat>!4d<lng>..." -- algunos links cortos redirigen
+     * directo a una ficha de lugar (/place/...) sin segmento "@lat,lng" en la URL, el punto de
+     * referencia visual solo viaja en estos parametros internos. Confirmado en vivo (2026-11-20,
+     * carga de clientes Pedregal): 17 de 48 links reales usaban este formato exclusivamente. */
+    private static final Pattern PATRON_PLACE_3D4D = Pattern.compile("!3d(-?\\d+\\.\\d+)!4d(-?\\d+\\.\\d+)");
 
     private final RestClient restClient;
     private final HttpClient httpClientRedirects;
@@ -127,9 +132,9 @@ public class GoogleMapsClient {
         return builder.build();
     }
 
-    /** null si el link ya no trae coordenadas en el texto (ninguno de los 3 formatos conocidos). */
+    /** null si el link ya no trae coordenadas en el texto (ninguno de los 4 formatos conocidos). */
     private BigDecimal[] extraerCoordenadas(String texto) {
-        for (Pattern patron : List.of(PATRON_ARROBA, PATRON_QUERY, PATRON_CRUDO)) {
+        for (Pattern patron : List.of(PATRON_ARROBA, PATRON_QUERY, PATRON_CRUDO, PATRON_PLACE_3D4D)) {
             Matcher m = patron.matcher(texto);
             if (m.find()) {
                 try {
