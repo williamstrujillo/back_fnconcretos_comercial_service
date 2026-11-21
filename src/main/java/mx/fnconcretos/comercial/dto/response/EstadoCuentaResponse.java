@@ -43,9 +43,12 @@ public class EstadoCuentaResponse {
 
     // --- Antiguedad de saldos (dashboard de cartera/morosos) ---
     private Integer diasVencidoMax;
-    private BigDecimal rango0a30;
-    private BigDecimal rango31a60;
-    private BigDecimal rango61a90;
+    private BigDecimal rango0a15;
+    private BigDecimal rango16a30;
+    private BigDecimal rango31a45;
+    private BigDecimal rango46a60;
+    private BigDecimal rango61a75;
+    private BigDecimal rango76a90;
     private BigDecimal rango90mas;
     private List<FinanzasClient.PedidoVencidoInfo> pedidosVencidos;
 }
