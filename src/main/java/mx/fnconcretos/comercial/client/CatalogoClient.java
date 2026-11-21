@@ -133,6 +133,8 @@ public class CatalogoClient {
         private BigDecimal capacidadReferenciaM3;
         private BigDecimal precioPorM3Vacio;
         private BigDecimal precioPorM3Bombeo;
+        private BigDecimal capacidadMinimaBombeoM3;
+        private BigDecimal precioPorM3VacioBombeo;
         private BigDecimal porcentajeIva;
         private BigDecimal latitud;
         private BigDecimal longitud;
