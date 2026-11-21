@@ -40,7 +40,7 @@ public class PedidoDetalle {
     @Column(name = "servicio_bombeo_id")
     private Long servicioBombeoId;
 
-    /** producto, bombeo, flete_vacio, otro */
+    /** producto, bombeo, flete_vacio, vacio_bombeo, otro */
     @Column(name = "tipo_linea", nullable = false, length = 20)
     @Builder.Default
     private String tipoLinea = "producto";

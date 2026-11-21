@@ -542,6 +542,10 @@ public class CotizacionService {
         // genera ninguna automatica encima (evitaria duplicarla).
         boolean fleteVacioManual = items.stream().anyMatch(item -> "flete_vacio".equals(tipoLinea(item)));
 
+        // Mismo criterio para el vacio de bombeo: si el request ya trae una linea explicita, no se
+        // genera ninguna automatica encima.
+        boolean vacioBombeoManual = items.stream().anyMatch(item -> "vacio_bombeo".equals(tipoLinea(item)));
+
         List<CotizacionDetalle> lineas = new java.util.ArrayList<>();
         for (CotizacionItemRequest item : items) {
             String tipo = tipoLinea(item);
@@ -594,6 +598,24 @@ public class CotizacionService {
                         .precioTotal(volumen.multiply(item.getPrecioUnitario()).setScale(2, RoundingMode.HALF_UP))
                         .descripcion(item.getDescripcion() != null ? item.getDescripcion() : "Bombeo")
                         .build());
+
+                if (!vacioBombeoManual) {
+                    BigDecimal minimoBombeo = tarifas.getCapacidadMinimaBombeoM3();
+                    // Mismo criterio que flete por vacio: si el servicio de bombeo pide menos m3
+                    // que el minimo de la planta, se cobra el faltante como "vacio de bombeo".
+                    if (minimoBombeo != null && minimoBombeo.signum() > 0 && volumen.compareTo(minimoBombeo) < 0) {
+                        BigDecimal vacio = minimoBombeo.subtract(volumen);
+                        BigDecimal precioVacioBombeo = tarifas.getPrecioPorM3VacioBombeo() != null ? tarifas.getPrecioPorM3VacioBombeo() : BigDecimal.ZERO;
+                        lineas.add(CotizacionDetalle.builder()
+                                .tipoLinea("vacio_bombeo")
+                                .volumenM3(vacio)
+                                .precioUnitarioBase(precioVacioBombeo)
+                                .precioUnitario(precioVacioBombeo)
+                                .precioTotal(vacio.multiply(precioVacioBombeo).setScale(2, RoundingMode.HALF_UP))
+                                .descripcion("Vacio de bombeo")
+                                .build());
+                    }
+                }
             } else if ("flete_vacio".equals(tipo)) {
                 // El asesor edito (o creo a mano) esta linea -- se respeta el volumen/precio que
                 // mande, completando con el default de la planta solo lo que falte (mismo
@@ -612,6 +634,24 @@ public class CotizacionService {
                         .precioUnitario(precioUnitario)
                         .precioTotal(volumen.multiply(precioUnitario).setScale(2, RoundingMode.HALF_UP))
                         .descripcion(item.getDescripcion() != null ? item.getDescripcion() : "Flete por vacio")
+                        .build());
+            } else if ("vacio_bombeo".equals(tipo)) {
+                // Mismo criterio que flete_vacio manual: se respeta el volumen/precio que mande el
+                // asesor, con el default de la planta como fallback. Asesor Comercial tampoco puede
+                // tocar el costo de esta linea.
+                BigDecimal precioVacioBombeoDefault = tarifas.getPrecioPorM3VacioBombeo() != null ? tarifas.getPrecioPorM3VacioBombeo() : BigDecimal.ZERO;
+                BigDecimal volumen = item.getVolumenM3() != null ? item.getVolumenM3() : BigDecimal.ZERO;
+                boolean esAsesorComercial = principal != null && ROL_ASESOR_COMERCIAL.equals(principal.rol());
+                BigDecimal precioUnitario = !esAsesorComercial && item.getPrecioUnitario() != null
+                        ? item.getPrecioUnitario()
+                        : precioVacioBombeoDefault;
+                lineas.add(CotizacionDetalle.builder()
+                        .tipoLinea("vacio_bombeo")
+                        .volumenM3(volumen)
+                        .precioUnitarioBase(precioUnitario)
+                        .precioUnitario(precioUnitario)
+                        .precioTotal(volumen.multiply(precioUnitario).setScale(2, RoundingMode.HALF_UP))
+                        .descripcion(item.getDescripcion() != null ? item.getDescripcion() : "Vacio de bombeo")
                         .build());
             } else {
                 if (item.getVolumenM3() == null) {
