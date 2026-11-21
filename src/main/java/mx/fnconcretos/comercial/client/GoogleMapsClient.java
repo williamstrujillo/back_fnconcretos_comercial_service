@@ -40,6 +40,7 @@ public class GoogleMapsClient {
     private static final Pattern PATRON_PLACE_3D4D = Pattern.compile("!3d(-?\\d+\\.\\d+)!4d(-?\\d+\\.\\d+)");
 
     private final RestClient restClient;
+    private final RestClient routesRestClient;
     private final HttpClient httpClientRedirects;
     private final String apiKey;
 
@@ -47,6 +48,11 @@ public class GoogleMapsClient {
         this.apiKey = apiKey;
         this.restClient = RestClient.builder()
                 .baseUrl("https://maps.googleapis.com/maps/api")
+                .build();
+        // Host y forma de autenticarse distintos a los del resto de la clase (header en vez de
+        // query param "key") -- Routes API es un producto separado, no vive bajo /maps/api/.
+        this.routesRestClient = RestClient.builder()
+                .baseUrl("https://routes.googleapis.com")
                 .build();
         this.httpClientRedirects = HttpClient.newBuilder()
                 .followRedirects(HttpClient.Redirect.ALWAYS)
@@ -61,37 +67,26 @@ public class GoogleMapsClient {
         if (origenLat == null || origenLng == null || destinoLat == null || destinoLng == null) return null;
 
         try {
-            DistanceMatrixResponse response = restClient.get()
-                    .uri(uriBuilder -> uriBuilder.path("/distancematrix/json")
-                            .queryParam("origins", origenLat + "," + origenLng)
-                            .queryParam("destinations", destinoLat + "," + destinoLng)
-                            .queryParam("mode", "driving")
-                            .queryParam("units", "metric")
-                            .queryParam("key", apiKey)
-                            .build())
+            RoutesRequest body = RoutesRequest.of(origenLat, origenLng, destinoLat, destinoLng);
+            RoutesResponse response = routesRestClient.post()
+                    .uri("/directions/v2:computeRoutes")
+                    .header("X-Goog-Api-Key", apiKey)
+                    .header("X-Goog-FieldMask", "routes.distanceMeters")
+                    .body(body)
                     .retrieve()
-                    .body(DistanceMatrixResponse.class);
+                    .body(RoutesResponse.class);
 
-            if (response == null || !"OK".equals(response.getStatus())) {
-                log.warn("Google Distance Matrix respondio status={}", response != null ? response.getStatus() : null);
-                return null;
-            }
-            Element elemento = response.getRows().stream()
-                    .findFirst()
-                    .map(Row::getElements)
-                    .filter(list -> !list.isEmpty())
-                    .map(list -> list.get(0))
-                    .orElse(null);
-            if (elemento == null || !"OK".equals(elemento.getStatus()) || elemento.getDistance() == null) {
-                log.warn("Google Distance Matrix sin ruta valida entre los puntos dados (elemento status={})",
-                        elemento != null ? elemento.getStatus() : null);
+            Long metros = response != null && response.getRoutes() != null && !response.getRoutes().isEmpty()
+                    ? response.getRoutes().get(0).getDistanceMeters()
+                    : null;
+            if (metros == null) {
+                log.warn("Google Routes API no regreso ninguna ruta valida entre los puntos dados");
                 return null;
             }
 
-            BigDecimal metros = BigDecimal.valueOf(elemento.getDistance().getValue());
-            return metros.divide(BigDecimal.valueOf(1000), 1, RoundingMode.HALF_UP);
+            return BigDecimal.valueOf(metros).divide(BigDecimal.valueOf(1000), 1, RoundingMode.HALF_UP);
         } catch (Exception e) {
-            log.warn("No se pudo calcular la distancia via Google Maps: {}", e.getMessage());
+            log.warn("No se pudo calcular la distancia via Google Maps (Routes API): {}", e.getMessage());
             return null;
         }
     }
@@ -232,24 +227,52 @@ public class GoogleMapsClient {
     }
 
     @Data
-    public static class DistanceMatrixResponse {
-        private String status;
-        private List<Row> rows;
+    public static class RoutesRequest {
+        private LatLngLocation origin;
+        private LatLngLocation destination;
+        private String travelMode;
+
+        static RoutesRequest of(BigDecimal origenLat, BigDecimal origenLng, BigDecimal destinoLat, BigDecimal destinoLng) {
+            RoutesRequest request = new RoutesRequest();
+            request.origin = LatLngLocation.of(origenLat, origenLng);
+            request.destination = LatLngLocation.of(destinoLat, destinoLng);
+            request.travelMode = "DRIVE";
+            return request;
+        }
     }
 
     @Data
-    public static class Row {
-        private List<Element> elements;
+    public static class LatLngLocation {
+        private LocationWrapper location;
+
+        static LatLngLocation of(BigDecimal lat, BigDecimal lng) {
+            LatLngLocation l = new LatLngLocation();
+            l.location = new LocationWrapper();
+            l.location.latLng = new LatLng();
+            l.location.latLng.latitude = lat.doubleValue();
+            l.location.latLng.longitude = lng.doubleValue();
+            return l;
+        }
     }
 
     @Data
-    public static class Element {
-        private String status;
-        private Distance distance;
+    public static class LocationWrapper {
+        private LatLng latLng;
     }
 
     @Data
-    public static class Distance {
-        private long value;
+    public static class LatLng {
+        private double latitude;
+        private double longitude;
+    }
+
+    @Data
+    public static class RoutesResponse {
+        private List<RouteResult> routes;
+    }
+
+    @Data
+    public static class RouteResult {
+        private Long distanceMeters;
     }
 }
