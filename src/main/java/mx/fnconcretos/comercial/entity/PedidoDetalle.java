@@ -69,7 +69,7 @@ public class PedidoDetalle {
     @Builder.Default
     private BigDecimal precioTotal = BigDecimal.ZERO;
 
-    /** etiqueta libre para lineas que no son producto, ej. "Bombeo", "Flete por vacio" */
+    /** etiqueta libre para lineas que no son producto, ej. "Bombeo", "Minimo de vacio" */
     @Column(name = "descripcion", length = 120)
     private String descripcion;
 }
