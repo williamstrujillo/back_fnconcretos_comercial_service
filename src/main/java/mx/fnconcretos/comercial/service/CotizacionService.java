@@ -563,7 +563,7 @@ public class CotizacionService {
                         .volumenM3(volumen)
                         .precioUnitarioBase(precioBase)
                         .precioUnitario(precioConForaneo)
-                        .precioTotal(precioConDescuento(precioConForaneo, volumen, descuento, descuentoLinea))
+                        .precioTotal(precioConMargen(precioConForaneo, volumen, descuento, descuentoLinea))
                         .porcentajeDescuentoLinea(descuentoLinea)
                         .descripcion(item.getDescripcion())
                         .build());
@@ -681,10 +681,21 @@ public class CotizacionService {
     /** Descuento general (cabecera) y descuento de linea se combinan multiplicativamente (igual que
      * "10% de descuento y luego 5% extra sobre lo ya rebajado" en retail) -- no aditivo, para que
      * nunca se pueda pasar de 100% combinando ambos por accidente. */
-    private BigDecimal precioConDescuento(BigDecimal precioUnitario, BigDecimal volumen, BigDecimal descuento, BigDecimal descuentoLinea) {
-        BigDecimal factorGeneral = BigDecimal.ONE.subtract(descuento.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
-        BigDecimal factorLinea = BigDecimal.ONE.subtract(descuentoLinea.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
-        return precioUnitario.multiply(factorGeneral).multiply(factorLinea).multiply(volumen).setScale(2, RoundingMode.HALF_UP);
+    /** "Descuento" ahora se captura y valida como % de MARGEN, no como descuento multiplicativo
+     * directo (pedido explicito 2026-11-21): precio_final = precio_unitario / (1 - margen/100).
+     * Negativo = rebaja el precio (lo que antes era "descuento"), positivo = lo aumenta (markup).
+     * Las dos "capas" (general + extra por linea) se componen dividiendo una tras otra -- mismo
+     * criterio que antes se multiplicaban factorGeneral*factorLinea. Los campos/columnas siguen
+     * llamandose porcentajeDescuento/porcentajeDescuentoLinea (mismo campo, ver validarDescuento),
+     * solo cambio la formula que se les aplica. */
+    private BigDecimal precioConMargen(BigDecimal precioUnitario, BigDecimal volumen, BigDecimal margen, BigDecimal margenLinea) {
+        BigDecimal divisorGeneral = BigDecimal.ONE.subtract(margen.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
+        BigDecimal divisorLinea = BigDecimal.ONE.subtract(margenLinea.divide(BigDecimal.valueOf(100), 6, RoundingMode.HALF_UP));
+        return precioUnitario
+                .divide(divisorGeneral, 10, RoundingMode.HALF_UP)
+                .divide(divisorLinea, 10, RoundingMode.HALF_UP)
+                .multiply(volumen)
+                .setScale(2, RoundingMode.HALF_UP);
     }
 
     /** "Cuantos m3 en total esta solicitando el cliente" = solo lineas de producto (bombeo/flete_vacio son cargos, no concreto). */
@@ -707,47 +718,68 @@ public class CotizacionService {
                 .orElse(BigDecimal.ZERO);
     }
 
-    /** Rango habilitado segun quien cotiza. Si el usuario tiene el rol "Asesor Comercial" (interno
-     * o externo, sin distincion), aplica un rango unico descuentoMinAsesor-descuentoMaxAsesor
-     * (default 5-10%), sin importar requiereFactura/formaPago. Para cualquier otro rol (ej. Call
-     * Center) se mantiene el rango previo segun requiereFactura: sin factura
-     * descuentoMinSinFactura-descuentoMaxSinFactura (default 0-6%), con factura
-     * descuentoMinConFactura-descuentoMaxConFactura (default 8-11%). Salirse del rango que
-     * corresponda (por arriba O por abajo) requiere el permiso
+    /** Rango habilitado segun quien cotiza. El valor capturado es % de MARGEN, no descuento directo
+     * (ver precioConMargen): negativo rebaja el precio, positivo lo aumenta (markup). Las
+     * propiedades negocio.descuento.* siguen expresando "cuantos puntos de descuento se permiten
+     * sin autorizacion especial" (ej. max-sin-factura=6 = "hasta 6% de descuento"), asi que el
+     * rango de margen permitido es el espejo negativo de ese rango: [-max, -min]. Si el usuario
+     * tiene el rol "Asesor Comercial" (interno o externo, sin distincion), aplica un rango unico
+     * [-descuentoMaxAsesor, -descuentoMinAsesor] (default -10% a -5%), sin importar
+     * requiereFactura/formaPago. Para cualquier otro rol (ej. Call Center) se mantiene el rango
+     * previo segun requiereFactura: sin factura [-descuentoMaxSinFactura, -descuentoMinSinFactura]
+     * (default -6% a 0%), con factura [-descuentoMaxConFactura, -descuentoMinConFactura] (default
+     * -11% a -8%). Cualquier margen positivo (markup) cae fuera de los 3 rangos por definicion.
+     * Salirse del rango que corresponda (por arriba O por abajo) requiere el permiso
      * cotizaciones.aplicar_descuento_especial. */
     private void validarDescuento(BigDecimal descuento, Boolean requiereFactura, JwtPrincipal principal) {
         BigDecimal valor = descuento != null ? descuento : BigDecimal.ZERO;
+
+        if (valor.compareTo(BigDecimal.valueOf(100)) >= 0) {
+            throw new IllegalArgumentException("El margen no puede ser mayor o igual a 100% (precio_unitario / (1 - margen/100) quedaria indefinido o negativo)");
+        }
+
         boolean esAsesorComercial = principal != null && ROL_ASESOR_COMERCIAL.equals(principal.rol());
 
-        BigDecimal min;
-        BigDecimal max;
+        BigDecimal maxDescuento;
+        BigDecimal minDescuento;
         String etiquetaRango;
         if (esAsesorComercial) {
-            min = descuentoMinAsesor;
-            max = descuentoMaxAsesor;
+            minDescuento = descuentoMinAsesor;
+            maxDescuento = descuentoMaxAsesor;
             etiquetaRango = "para asesores comerciales";
         } else {
             boolean factura = Boolean.TRUE.equals(requiereFactura);
-            min = factura ? descuentoMinConFactura : descuentoMinSinFactura;
-            max = factura ? descuentoMaxConFactura : descuentoMaxSinFactura;
+            minDescuento = factura ? descuentoMinConFactura : descuentoMinSinFactura;
+            maxDescuento = factura ? descuentoMaxConFactura : descuentoMaxSinFactura;
             etiquetaRango = "para cotizaciones " + (factura ? "con" : "sin") + " factura";
         }
+        BigDecimal min = maxDescuento.negate();
+        BigDecimal max = minDescuento.negate();
 
         boolean fueraDeRango = valor.compareTo(min) < 0 || valor.compareTo(max) > 0;
         if (fueraDeRango && (principal == null || !principal.tienePermiso("cotizaciones.aplicar_descuento_especial"))) {
-            throw new AccessDeniedException("El descuento de " + valor + "% esta fuera del rango permitido (" + min + "% - " + max
+            throw new AccessDeniedException("El margen de " + valor + "% esta fuera del rango permitido (" + min + "% - " + max
                     + "%) " + etiquetaRango + "; se requiere el permiso cotizaciones.aplicar_descuento_especial");
         }
     }
 
-    /** Cualquier descuento de linea (aparte del general ya validado en validarDescuento) requiere el
-     * mismo permiso especial -- si no, seria una forma trivial de saltarse el rango de descuento
-     * general ya negociado (0-6%/8-11%) agregando "descuento extra" por producto sin control. */
+    /** Cualquier margen de linea (aparte del general ya validado en validarDescuento) requiere el
+     * mismo permiso especial -- si no, seria una forma trivial de saltarse el rango de margen
+     * general ya negociado agregando un ajuste extra por producto sin control. Antes solo se
+     * revisaba el signo positivo (descuento > 0); ahora cualquier valor distinto de cero (rebaja O
+     * markup extra por linea) requiere el permiso. */
     private void validarDescuentosLinea(List<CotizacionItemRequest> items, JwtPrincipal principal) {
-        boolean tieneDescuentoLinea = items != null && items.stream()
-                .anyMatch(item -> item.getPorcentajeDescuentoLinea() != null && item.getPorcentajeDescuentoLinea().signum() > 0);
+        if (items == null) return;
+        for (CotizacionItemRequest item : items) {
+            BigDecimal margenLinea = item.getPorcentajeDescuentoLinea();
+            if (margenLinea != null && margenLinea.compareTo(BigDecimal.valueOf(100)) >= 0) {
+                throw new IllegalArgumentException("El margen de linea no puede ser mayor o igual a 100%");
+            }
+        }
+        boolean tieneDescuentoLinea = items.stream()
+                .anyMatch(item -> item.getPorcentajeDescuentoLinea() != null && item.getPorcentajeDescuentoLinea().compareTo(BigDecimal.ZERO) != 0);
         if (tieneDescuentoLinea && (principal == null || !principal.tienePermiso("cotizaciones.aplicar_descuento_especial"))) {
-            throw new AccessDeniedException("Aplicar un descuento extra por producto requiere el permiso cotizaciones.aplicar_descuento_especial");
+            throw new AccessDeniedException("Aplicar un margen extra por producto requiere el permiso cotizaciones.aplicar_descuento_especial");
         }
     }
 

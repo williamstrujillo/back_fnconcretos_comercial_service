@@ -1,7 +1,7 @@
 package mx.fnconcretos.comercial.dto.request;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -68,7 +68,11 @@ public class CotizacionRequest {
      * si se emitira CFDI. */
     private Boolean requiereFactura;
 
-    @DecimalMin(value = "0.0", message = "El descuento no puede ser negativo")
+    /** % de MARGEN (no descuento directo, ver CotizacionService.precioConMargen): negativo rebaja
+     * el precio, positivo lo aumenta (markup). El limite superior evita que precio_unitario /
+     * (1 - margen/100) quede indefinido o negativo; el rango habilitado sin permiso especial
+     * (-6%..0% sin factura, -11%..-8% con factura) se valida en CotizacionService.validarDescuento. */
+    @DecimalMax(value = "99.99", message = "El margen no puede ser mayor o igual a 100%")
     private BigDecimal porcentajeDescuento;
 
     @Size(max = 250, message = "Las observaciones no pueden exceder 250 caracteres")

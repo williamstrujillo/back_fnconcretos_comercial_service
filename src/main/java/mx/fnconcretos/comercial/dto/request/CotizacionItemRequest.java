@@ -1,5 +1,6 @@
 package mx.fnconcretos.comercial.dto.request;
 
+import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -47,9 +48,9 @@ public class CotizacionItemRequest {
     /** etiqueta libre, ej. "Bombeo pluma rentada" */
     private String descripcion;
 
-    /** % de descuento EXTRA de esta linea, aparte del descuento general de la cotizacion. Solo
-     * aplica si tipoLinea=producto. Cualquier valor > 0 requiere el permiso
-     * cotizaciones.aplicar_descuento_especial (ver CotizacionService.validarDescuentosLinea). */
-    @DecimalMin(value = "0.0", message = "El descuento de linea no puede ser negativo")
+    /** % de MARGEN extra de esta linea, aparte del margen general de la cotizacion (negativo rebaja,
+     * positivo aumenta). Solo aplica si tipoLinea=producto. Cualquier valor distinto de 0 requiere
+     * el permiso cotizaciones.aplicar_descuento_especial (ver CotizacionService.validarDescuentosLinea). */
+    @DecimalMax(value = "99.99", message = "El margen de linea no puede ser mayor o igual a 100%")
     private BigDecimal porcentajeDescuentoLinea;
 }
