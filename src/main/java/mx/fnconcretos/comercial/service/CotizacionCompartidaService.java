@@ -239,8 +239,8 @@ public class CotizacionCompartidaService {
     private String etiquetaTipoLinea(String tipoLinea) {
         return switch (tipoLinea) {
             case "bombeo" -> "Bombeo";
-            case "flete_vacio" -> "Mínimo de vacío";
-            case "vacio_bombeo" -> "Mínimo de bombeo";
+            case "flete_vacio" -> "MÍNIMO DE VACÍO";
+            case "vacio_bombeo" -> "MÍNIMO DE BOMBEO";
             default -> "Otro";
         };
     }

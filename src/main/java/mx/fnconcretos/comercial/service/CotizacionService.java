@@ -583,7 +583,7 @@ public class CotizacionService {
                                 .precioUnitarioBase(precioVacio)
                                 .precioUnitario(precioVacio)
                                 .precioTotal(vacio.multiply(precioVacio).setScale(2, RoundingMode.HALF_UP))
-                                .descripcion("Minimo de vacio")
+                                .descripcion("MINIMO DE VACIO")
                                 .build());
                     }
                 }
@@ -612,7 +612,7 @@ public class CotizacionService {
                                 .precioUnitarioBase(precioVacioBombeo)
                                 .precioUnitario(precioVacioBombeo)
                                 .precioTotal(vacio.multiply(precioVacioBombeo).setScale(2, RoundingMode.HALF_UP))
-                                .descripcion("Minimo de bombeo")
+                                .descripcion("MINIMO DE BOMBEO")
                                 .build());
                     }
                 }
@@ -633,7 +633,7 @@ public class CotizacionService {
                         .precioUnitarioBase(precioUnitario)
                         .precioUnitario(precioUnitario)
                         .precioTotal(volumen.multiply(precioUnitario).setScale(2, RoundingMode.HALF_UP))
-                        .descripcion(item.getDescripcion() != null ? item.getDescripcion() : "Minimo de vacio")
+                        .descripcion(item.getDescripcion() != null ? item.getDescripcion() : "MINIMO DE VACIO")
                         .build());
             } else if ("vacio_bombeo".equals(tipo)) {
                 // Mismo criterio que flete_vacio manual: se respeta el volumen/precio que mande el
@@ -651,7 +651,7 @@ public class CotizacionService {
                         .precioUnitarioBase(precioUnitario)
                         .precioUnitario(precioUnitario)
                         .precioTotal(volumen.multiply(precioUnitario).setScale(2, RoundingMode.HALF_UP))
-                        .descripcion(item.getDescripcion() != null ? item.getDescripcion() : "Minimo de bombeo")
+                        .descripcion(item.getDescripcion() != null ? item.getDescripcion() : "MINIMO DE BOMBEO")
                         .build());
             } else {
                 if (item.getVolumenM3() == null) {
