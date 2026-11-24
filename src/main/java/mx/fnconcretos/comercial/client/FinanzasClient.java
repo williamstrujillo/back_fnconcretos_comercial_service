@@ -50,6 +50,29 @@ public class FinanzasClient {
     }
 
     /**
+     * Aplica, FIFO, el saldo a_favor de migracion disponible del cliente contra un pedido recien
+     * creado (ver SaldoInicialClienteService.aplicarAFavorDisponible en finanzas-service) --
+     * llamada desde CotizacionService.convertirAPedido, justo al crear el pedido. bearerToken debe
+     * incluir "Bearer ". Una falla aqui nunca debe bloquear la conversion (ver el try/catch del
+     * lado que llama).
+     */
+    public void aplicarSaldoAFavorCliente(Long clienteId, Long pedidoId, BigDecimal montoTotalPedido, String bearerToken) {
+        restClient.post()
+                .uri("/clientes/{clienteId}/saldo-inicial/aplicar-a-favor", clienteId)
+                .header(HttpHeaders.AUTHORIZATION, bearerToken)
+                .body(new AplicarSaldoInicialRequest(pedidoId, montoTotalPedido))
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+    @Data
+    @lombok.AllArgsConstructor
+    public static class AplicarSaldoInicialRequest {
+        private Long pedidoId;
+        private BigDecimal montoTotalPedido;
+    }
+
+    /**
      * Notifica que un pedido llego a estatusGeneral=completo -- finanzas-service decide internamente
      * si genera la prefactura automatica (solo si el cliente tiene modalidadFacturacion=por_pedido;
      * si no, no hace nada). bearerToken debe incluir "Bearer ". Llamada desde PedidoService al mismo
