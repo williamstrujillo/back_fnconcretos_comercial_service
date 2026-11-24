@@ -218,12 +218,17 @@ public class CotizacionCompartidaService {
                 descripcion = linea.getDescripcion() != null ? linea.getDescripcion() : etiquetaTipoLinea(linea.getTipoLinea());
             }
             BigDecimal importe = linea.getPrecioTotal();
+            BigDecimal cantidad = linea.getVolumenM3();
+            BigDecimal precioUnitarioEfectivo = (cantidad != null && cantidad.signum() > 0)
+                    ? importe.divide(cantidad, 2, RoundingMode.HALF_UP)
+                    : linea.getPrecioUnitario();
             return CotizacionPublicaResponse.LineaInfo.builder()
                     .codigo(null)
                     .descripcion(descripcion)
-                    .cantidad(linea.getVolumenM3())
+                    .cantidad(cantidad)
                     .unidad("M3")
                     .precioUnitario(linea.getPrecioUnitario())
+                    .precioUnitarioEfectivo(precioUnitarioEfectivo)
                     .importe(importe)
                     .build();
         }).toList();
