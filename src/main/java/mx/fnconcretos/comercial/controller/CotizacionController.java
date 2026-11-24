@@ -85,8 +85,9 @@ public class CotizacionController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Convertir una cotizacion en estatus 'listo' en un pedido formal")
     public PedidoResponse convertirAPedido(@PathVariable Long id, @Valid @RequestBody ConvertirPedidoRequest request,
-                                            @AuthenticationPrincipal JwtPrincipal principal) {
-        return cotizacionService.convertirAPedido(id, request, principal);
+                                            @AuthenticationPrincipal JwtPrincipal principal,
+                                            @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) {
+        return cotizacionService.convertirAPedido(id, request, principal, authorization);
     }
 
     @PostMapping("/{id}/enviar-whatsapp")

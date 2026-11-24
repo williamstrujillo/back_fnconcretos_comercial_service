@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import mx.fnconcretos.comercial.client.CatalogoClient;
+import mx.fnconcretos.comercial.client.FinanzasClient;
 import mx.fnconcretos.comercial.client.GoogleMapsClient;
 import mx.fnconcretos.comercial.client.WhatsAppClient;
 import mx.fnconcretos.comercial.dto.request.CotizacionItemRequest;
@@ -61,6 +62,7 @@ public class CotizacionService {
     private final CatalogoClient catalogoClient;
     private final GoogleMapsClient googleMapsClient;
     private final WhatsAppClient whatsAppClient;
+    private final FinanzasClient finanzasClient;
     private final CotizacionCompartidaService cotizacionCompartidaService;
     private final BitacoraService bitacoraService;
     private final ObjectMapper objectMapper;
@@ -418,7 +420,7 @@ public class CotizacionService {
     }
 
     @Transactional
-    public PedidoResponse convertirAPedido(Long id, ConvertirPedidoRequest request, JwtPrincipal principal) {
+    public PedidoResponse convertirAPedido(Long id, ConvertirPedidoRequest request, JwtPrincipal principal, String bearerToken) {
         Cotizacion cotizacion = buscarPropiaOFallar(id, principal);
         if (!"listo".equals(cotizacion.getEstatus())) {
             throw new EstadoInvalidoException("Solo se puede convertir a pedido una cotizacion en estatus 'listo'");
@@ -503,7 +505,23 @@ public class CotizacionService {
         bitacoraService.registrar("pedido", guardado.getId(), "creacion",
                 "Creado a partir de la cotizacion " + cotizacion.getFolio(), usuario);
 
+        aplicarSaldoAFavorCliente(guardado, lineasPedido, bearerToken);
+
         return toPedidoResponse(guardado, lineasPedido);
+    }
+
+    /** Si el cliente tiene saldo a favor migrado disponible (SaldoInicialCliente), se aplica solo
+     * contra este pedido recien creado -- mismo criterio que OrdenCompraService.autorizar hace para
+     * proveedores, pero via HTTP porque Cliente/Pedido viven aqui y el saldo vive en
+     * finanzas-service. Nunca bloquea la conversion: una falla de red/4xx/5xx aqui solo se registra
+     * en el log, el pedido ya quedo creado y confirmado en la misma transaccion de arriba. */
+    private void aplicarSaldoAFavorCliente(Pedido pedido, List<PedidoDetalle> lineas, String bearerToken) {
+        try {
+            BigDecimal montoTotalPedido = lineas.stream().map(PedidoDetalle::getPrecioTotal).reduce(BigDecimal.ZERO, BigDecimal::add);
+            finanzasClient.aplicarSaldoAFavorCliente(pedido.getCliente().getId(), pedido.getId(), montoTotalPedido, bearerToken);
+        } catch (Exception e) {
+            log.warn("No se pudo aplicar el saldo a favor del cliente contra el pedido {}: {}", pedido.getId(), e.getMessage());
+        }
     }
 
     /** Rol que no puede modificar el costo (precioUnitario) del flete por vacio -- puede editar el
