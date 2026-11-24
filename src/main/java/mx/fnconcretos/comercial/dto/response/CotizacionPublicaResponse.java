@@ -85,6 +85,10 @@ public class CotizacionPublicaResponse {
         private BigDecimal cantidad;
         private String unidad;
         private BigDecimal precioUnitario;
+        /** Precio real ya con el margen aplicado (= importe / cantidad) -- se muestra aparte, junto
+         * al precio base, cuando difiere (ver DocumentoComercialImprimible.jsx en el frontend), para
+         * que la multiplicacion cantidad x precio siempre cuadre con lo que se ve impreso. */
+        private BigDecimal precioUnitarioEfectivo;
         private BigDecimal importe;
     }
 
