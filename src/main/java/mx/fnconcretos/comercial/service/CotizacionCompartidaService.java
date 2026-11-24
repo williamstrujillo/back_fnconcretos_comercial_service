@@ -153,6 +153,10 @@ public class CotizacionCompartidaService {
                             .filter(s -> s != null && !s.isBlank())
                             .collect(Collectors.joining(", "))
                     : obra.getNombre();
+        } else {
+            // Cotizacion simple (obra sin registrar todavia) -- solo el nombre en texto libre,
+            // mismo criterio que construirCliente.
+            direccion = cotizacion.getObraNombreLibre();
         }
 
         String fechaHoraServicio = cotizacion.getFechaSuministroEstimada() != null
