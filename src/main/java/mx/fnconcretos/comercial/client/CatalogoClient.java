@@ -117,6 +117,8 @@ public class CatalogoClient {
     public static class ProductoInfo {
         private Long id;
         private String nombre;
+        /** Ej. "100", "250" -- usado al armar el WhatsApp de "pedido confirmado" ("4 m³ de f'c 100 kg/cm²"). */
+        private String resistencia;
     }
 
     @Data
