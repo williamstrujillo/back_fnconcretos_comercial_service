@@ -151,4 +151,24 @@ public class Pedido {
     @Lob
     @Column(name = "condiciones_snapshot", columnDefinition = "LONGTEXT")
     private String condicionesSnapshot;
+
+    /** Copiado de Cotizacion.subtotal al convertir (suma de lineas producto/bombeo/flete_vacio,
+     * SIN iva) -- base real de cualquier calculo de comision (ver ComisionPeriodoService en
+     * finanzas-service: las comisiones SIEMPRE se calculan sobre subtotal, nunca sobre total). */
+    @Column(name = "subtotal", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal subtotal = BigDecimal.ZERO;
+
+    /** Copiado de Cotizacion.iva al convertir; 0 si la cotizacion de origen no requeria factura. */
+    @Column(name = "iva", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal iva = BigDecimal.ZERO;
+
+    /** Copiado de Cotizacion.precioTotal al convertir (subtotal + iva) -- el monto real a cobrar.
+     * Coincide con la suma de pedido_detalle.precioTotal (incluida la linea sintetica de iva que
+     * se agrega ahi mismo), se guarda aparte solo para no tener que re-sumar lineas cada vez que
+     * se necesita. */
+    @Column(name = "total", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal total = BigDecimal.ZERO;
 }

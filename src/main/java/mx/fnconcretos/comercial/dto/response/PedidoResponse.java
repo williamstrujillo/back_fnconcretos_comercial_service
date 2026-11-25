@@ -57,6 +57,14 @@ public class PedidoResponse {
     private String formaPago;
     /** Suma de precioTotal de todas las lineas (producto + bombeo + flete_vacio + iva). */
     private java.math.BigDecimal montoTotal;
+    /** Suma de lineas producto/bombeo/flete_vacio, SIN iva -- base de cualquier calculo de
+     * comision (ver finanzas-service ComisionPeriodoService: las comisiones son siempre sobre
+     * subtotal, nunca sobre total). */
+    private java.math.BigDecimal subtotal;
+    /** 0 si la cotizacion de origen no requeria factura. */
+    private java.math.BigDecimal iva;
+    /** subtotal + iva -- el monto real a cobrar (coincide con montoTotal). */
+    private java.math.BigDecimal total;
     private String estatusPagoAutorizacion;
     private String estatusLogisticaAutorizacion;
     private String estatusGeneral;
