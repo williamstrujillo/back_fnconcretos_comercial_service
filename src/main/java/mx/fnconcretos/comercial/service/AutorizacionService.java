@@ -145,9 +145,10 @@ public class AutorizacionService {
 
     /**
      * Envia el WhatsApp de "pedido confirmado" al cliente -- formato "TIRO CONFIRMADO" (cliente,
-     * fecha y hora, concreto, descarga, estatus, ubicacion del tiro). Nunca bloquea la autorizacion.
-     * La plantilla ya NO lleva boton: la ubicacion va como variable de texto en el cuerpo (WhatsApp
-     * la hipervincula solo), asi que el ultimo parametro de enviarPlantilla es null.
+     * fecha y hora, concreto, descarga, estatus, ubicacion del tiro) + boton con el link publico
+     * del pedido (en vez de adjuntar un PDF -- mas rapido de implementar, mismo mecanismo de
+     * siempre: el boton de la plantilla ya aprobada en Meta trae la base fija, aqui solo se manda
+     * el token como sufijo dinamico). Nunca bloquea la autorizacion.
      */
     private void notificarClienteConfirmacion(Pedido pedido, String bearerToken) {
         Cliente cliente = pedido.getCliente();
@@ -164,7 +165,8 @@ public class AutorizacionService {
                     ESTATUS_LABELS.getOrDefault(pedido.getEstatusGeneral(), pedido.getEstatusGeneral()),
                     pedido.getObra() != null && pedido.getObra().getGoogleMapsLink() != null
                             ? pedido.getObra().getGoogleMapsLink() : "por confirmar");
-            whatsAppClient.enviarPlantilla(cliente.getTelefono(), "pedido_confirmado", "es_MX", parametros);
+            String tokenSeguimiento = operacionesClient.obtenerOCrearTokenSeguimiento(pedido.getId(), bearerToken);
+            whatsAppClient.enviarPlantilla(cliente.getTelefono(), "pedido_confirmado", "es_MX", parametros, tokenSeguimiento);
         } catch (Exception e) {
             log.warn("No se pudo enviar el WhatsApp de pedido confirmado al cliente del pedido {}: {}", pedido.getId(), e.getMessage());
         }
