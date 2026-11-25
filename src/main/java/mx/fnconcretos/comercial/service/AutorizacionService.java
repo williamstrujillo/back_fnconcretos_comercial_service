@@ -144,11 +144,14 @@ public class AutorizacionService {
     }
 
     /**
-     * Envia el WhatsApp de "pedido confirmado" al cliente -- formato "TIRO CONFIRMADO" (cliente,
-     * fecha y hora, concreto, descarga, estatus, ubicacion del tiro) + boton con el link publico
-     * del pedido (en vez de adjuntar un PDF -- mas rapido de implementar, mismo mecanismo de
-     * siempre: el boton de la plantilla ya aprobada en Meta trae la base fija, aqui solo se manda
-     * el token como sufijo dinamico). Nunca bloquea la autorizacion.
+     * Envia el WhatsApp de "pedido confirmado" al cliente -- plantilla "tiro_confirmado" (NO
+     * "pedido_confirmado", esa sigue siendo la vieja de 3 variables -- Meta no permite cambiar la
+     * estructura de una plantilla ya aprobada, asi que esta se sometio con nombre nuevo el
+     * 2026-11-25, status PENDING, id 1169353102298780). Formato "TIRO CONFIRMADO" (cliente, fecha
+     * y hora, concreto, descarga, estatus, ubicacion del tiro) + boton con el link publico del
+     * pedido (en vez de adjuntar un PDF -- mas rapido de implementar, mismo mecanismo de siempre:
+     * el boton de la plantilla trae la base fija ya aprobada, aqui solo se manda el token como
+     * sufijo dinamico). Nunca bloquea la autorizacion.
      */
     private void notificarClienteConfirmacion(Pedido pedido, String bearerToken) {
         Cliente cliente = pedido.getCliente();
@@ -166,7 +169,7 @@ public class AutorizacionService {
                     pedido.getObra() != null && pedido.getObra().getGoogleMapsLink() != null
                             ? pedido.getObra().getGoogleMapsLink() : "por confirmar");
             String tokenSeguimiento = operacionesClient.obtenerOCrearTokenSeguimiento(pedido.getId(), bearerToken);
-            whatsAppClient.enviarPlantilla(cliente.getTelefono(), "pedido_confirmado", "es_MX", parametros, tokenSeguimiento);
+            whatsAppClient.enviarPlantilla(cliente.getTelefono(), "tiro_confirmado", "es_MX", parametros, tokenSeguimiento);
         } catch (Exception e) {
             log.warn("No se pudo enviar el WhatsApp de pedido confirmado al cliente del pedido {}: {}", pedido.getId(), e.getMessage());
         }
